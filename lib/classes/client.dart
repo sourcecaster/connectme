@@ -19,8 +19,8 @@ class ConnectMeClient {
 
 	late final Function(String)? onLog;
 	late final Function(String, [StackTrace])? onError;
-	late final Function(ConnectMeClient)? onConnect;
-	late final Function(ConnectMeClient)? onDisconnect;
+	late final Function? onConnect;
+	late final Function? onDisconnect;
 
 	Future<void> _init() async {
 		await onLog?.call('Connecting to $url...');
@@ -29,9 +29,10 @@ class ConnectMeClient {
 		_listenSocket(asServer: false);
 	}
 
-	Future<void> _processHandler(Function handler, dynamic data, ConnectMeClient client) async {
+	Future<void> _processHandler(Function handler, dynamic data, [ConnectMeClient? client]) async {
 		try {
-			await handler(data, client);
+			if (client != null) await handler(data, client);
+			else await handler(data);
 		}
 		catch (err, stack) {
 			onError?.call('ConnectMe message handler execution error: $err', stack);
@@ -44,11 +45,11 @@ class ConnectMeClient {
 				final PackMeMessage? message = _packMe.unpack(data);
 				if (message != null) data = message;
 			}
-			if (_server._handlers[data.runtimeType] != null) {
+			if (asServer && _server._handlers[data.runtimeType] != null) {
 				for (final Function handler in _server._handlers[data.runtimeType]!) _processHandler(handler, data, this);
 			}
 			if (_handlers[data.runtimeType] != null) {
-				for (final Function handler in _handlers[data.runtimeType]!) _processHandler(handler, data, this);
+				for (final Function handler in _handlers[data.runtimeType]!) _processHandler(handler, data);
 			}
 		}, onDone: () {
 			if (asServer) {

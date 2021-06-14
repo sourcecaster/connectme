@@ -13,8 +13,8 @@ class ConnectMeServer {
 
 	final Function(String)? onLog;
 	final Function(String, [StackTrace])? onError;
-	final Function(ConnectMeClient)? onConnect;
-	final Function(ConnectMeClient)? onDisconnect;
+	final Function? onConnect;
+	final Function? onDisconnect;
 
 	Future<void> _init() async {
 		if (address.type == InternetAddressType.unix) {
@@ -60,12 +60,12 @@ class ConnectMeServer {
 		}
 	}
 
-	void listen<T>(Future<void> Function(T) handler) {
+	void listen<T, C extends ConnectMeClient>(Future<void> Function(T, C) handler) {
 		if (_handlers[T] == null) _handlers[T] = <Function>[];
 		_handlers[T]!.add(handler);
 	}
 
-	void cancel<T>(Future<void> Function(T) handler) {
+	void cancel<T, C extends ConnectMeClient>(Future<void> Function(T, C) handler) {
 		_handlers[T]?.remove(handler);
 	}
 

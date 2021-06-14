@@ -1,0 +1,12 @@
+{
+	"how_are_you": [
+		{
+			"name": "string",
+			"number": "uint16"
+		},
+		{
+			"answer": "string",
+			"square_root": "double"
+		}
+	]
+}

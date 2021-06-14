@@ -14,8 +14,8 @@ class ConnectMe {
 		ConnectMeClient Function(WebSocket, HttpHeaders)? clientFactory,
 		Function(String)? onLog,
 		Function(String, [StackTrace])? onError,
-		Function(ConnectMeClient)? onConnect,
-		Function(ConnectMeClient)? onDisconnect,
+		Function? onConnect,
+		Function? onDisconnect,
 	}) async {
 		final ConnectMeServer server = ConnectMeServer._(address, port, clientFactory, onLog, onError, onConnect, onDisconnect);
 		await server._init();
@@ -27,8 +27,8 @@ class ConnectMe {
 		bool autoReconnect = true,
 		Function(String)? onLog,
 		Function(String, [StackTrace])? onError,
-		Function(ConnectMeClient)? onConnect,
-		Function(ConnectMeClient)? onDisconnect,
+		Function? onConnect,
+		Function? onDisconnect,
 	}) async {
 		final ConnectMeClient client = ConnectMeClient._(url, headers, autoReconnect, onLog, onError, onConnect, onDisconnect);
 		await client._init();
