@@ -60,7 +60,7 @@ Future<void> connectSaySomethingAndDisconnect() async {
 Future<void> main() async {
 	final Random rand = Random();
 	/// ConnectMeServer supports both ip address and unix named sockets.
-	final ConnectMeServer server = await ConnectMe.listen(InternetAddress('127.0.0.1'),
+	final ConnectMeServer<CustomClient> server = await ConnectMe.listen(InternetAddress('127.0.0.1'),
 		port: 31337,
 		onLog: logMessage,
 		onError: logError,
@@ -82,7 +82,7 @@ Future<void> main() async {
 	server.register(manifestMessageFactory);
 
 	/// Add global server String message listener.
-	server.listen<String, CustomClient>((String message, CustomClient client) async {
+	server.listen<String>((String message, CustomClient client) async {
 		logMessage('${client.name} says: $message');
 
 		/// Once we've got hello message from the client, send him a PackMe
@@ -95,7 +95,7 @@ Future<void> main() async {
 	});
 
 	/// Add global PackMe HowAreYouResponse message listener.
-	server.listen<HowAreYouResponse, CustomClient>((HowAreYouResponse data, CustomClient client) async {
+	server.listen<HowAreYouResponse>((HowAreYouResponse data, CustomClient client) async {
 		logMessage('${client.name} says: ${data.answer}');
 		logMessage("And his answer is absolutely correct! It's ${data.squareRoot}!");
 	});

@@ -11,7 +11,7 @@ class ConnectMeClient {
 	final String url;
 	final bool _autoReconnect;
 	bool _applyReconnect = true;
-	late final ConnectMeServer _server;
+	late final ConnectMeServer<ConnectMeClient> _server;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
 	late WebSocket socket;
 	late final HttpHeaders headers;
@@ -25,6 +25,7 @@ class ConnectMeClient {
 	Future<void> _init() async {
 		await onLog?.call('Connecting to $url...');
 		socket = await WebSocket.connect(url, headers: requestHeaders);
+		onConnect?.call();
 		await onLog?.call('Connection established');
 		_listenSocket(asServer: false);
 	}
@@ -54,15 +55,16 @@ class ConnectMeClient {
 		}, onDone: () {
 			if (asServer) {
 				_server.clients.remove(this);
+				onDisconnect?.call(this);
 			}
 			else {
+				onDisconnect?.call();
 				if (_autoReconnect && _applyReconnect) {
 					onError?.call('Connection to $url was closed, reconnect in 3 second...');
 					Timer(const Duration(seconds: 3), _init);
 				}
 				else onLog?.call('Disconnected from $url');
 			}
-			onDisconnect?.call(this);
 		}, onError: (dynamic err, StackTrace stack) {
 			onError?.call('ConnectMe socket error occurred: $err', stack);
 		});

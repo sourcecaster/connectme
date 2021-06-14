@@ -1,20 +1,20 @@
 part of connectme;
 
-class ConnectMeServer {
+class ConnectMeServer<C extends ConnectMeClient> {
 	ConnectMeServer._(this.address, this.port, this._clientFactory, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
 	final PackMe _packMe;
 	final InternetAddress address;
 	final int port;
 	late final HttpServer? httpServer;
-	final List<ConnectMeClient> clients = <ConnectMeClient>[];
-	final ConnectMeClient Function(WebSocket, HttpHeaders)? _clientFactory;
+	final List<C> clients = <C>[];
+	final C Function(WebSocket, HttpHeaders)? _clientFactory;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
 
 	final Function(String)? onLog;
 	final Function(String, [StackTrace])? onError;
-	final Function? onConnect;
-	final Function? onDisconnect;
+	final Function(C)? onConnect;
+	final Function(C)? onDisconnect;
 
 	Future<void> _init() async {
 		if (address.type == InternetAddressType.unix) {
@@ -30,7 +30,7 @@ class ConnectMeServer {
 		if (httpServer != null) {
 			httpServer!.listen((HttpRequest request) async {
 				final WebSocket socket = await WebSocketTransformer.upgrade(request);
-				final ConnectMeClient client = _clientFactory != null ? _clientFactory!(socket, request.headers) : ConnectMeClient(socket, request.headers);
+				final C client = _clientFactory != null ? _clientFactory!(socket, request.headers) : ConnectMeClient(socket, request.headers) as C;
 				client._server = this;
 				client._packMe = _packMe;
 				client.onLog = onLog;
@@ -48,24 +48,24 @@ class ConnectMeServer {
 		_packMe.register(messageFactory);
 	}
 
-	void broadcast(dynamic data, {bool Function(ConnectMeClient)? where}) {
+	void broadcast(dynamic data, {bool Function(C)? where}) {
 		if (data is PackMeMessage) data = _packMe.pack(data);
 		else if (data is! Uint8List && data is! String) {
 			onError?.call('Unsupported data type for ConnectMe.broadcast, only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
-		for (final ConnectMeClient client in clients) {
+		for (final C client in clients) {
 			if (where != null && !where(client)) continue;
 			if (data != null) client.socket.add(data);
 		}
 	}
 
-	void listen<T, C extends ConnectMeClient>(Future<void> Function(T, C) handler) {
+	void listen<T>(Future<void> Function(T, C) handler) {
 		if (_handlers[T] == null) _handlers[T] = <Function>[];
 		_handlers[T]!.add(handler);
 	}
 
-	void cancel<T, C extends ConnectMeClient>(Future<void> Function(T, C) handler) {
+	void cancel<T>(Future<void> Function(T, C) handler) {
 		_handlers[T]?.remove(handler);
 	}
 

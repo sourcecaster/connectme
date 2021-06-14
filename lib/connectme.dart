@@ -9,15 +9,15 @@ part 'classes/client.dart';
 part 'classes/server.dart';
 
 class ConnectMe {
-	static Future<ConnectMeServer> listen(InternetAddress address, {
+	static Future<ConnectMeServer<C>> listen<C extends ConnectMeClient>(InternetAddress address, {
 		int port = 0,
-		ConnectMeClient Function(WebSocket, HttpHeaders)? clientFactory,
+		C Function(WebSocket, HttpHeaders)? clientFactory,
 		Function(String)? onLog,
 		Function(String, [StackTrace])? onError,
-		Function? onConnect,
-		Function? onDisconnect,
+		Function(C)? onConnect,
+		Function(C)? onDisconnect,
 	}) async {
-		final ConnectMeServer server = ConnectMeServer._(address, port, clientFactory, onLog, onError, onConnect, onDisconnect);
+		final ConnectMeServer<C> server = ConnectMeServer<C>._(address, port, clientFactory, onLog, onError, onConnect, onDisconnect);
 		await server._init();
 		return server;
 	}
@@ -27,8 +27,8 @@ class ConnectMe {
 		bool autoReconnect = true,
 		Function(String)? onLog,
 		Function(String, [StackTrace])? onError,
-		Function? onConnect,
-		Function? onDisconnect,
+		Function()? onConnect,
+		Function()? onDisconnect,
 	}) async {
 		final ConnectMeClient client = ConnectMeClient._(url, headers, autoReconnect, onLog, onError, onConnect, onDisconnect);
 		await client._init();
