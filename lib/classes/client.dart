@@ -66,7 +66,7 @@ class ConnectMeClient {
 				else onLog?.call('Disconnected from $url');
 			}
 		}, onError: (dynamic err, StackTrace stack) {
-			onError?.call('ConnectMe socket error occurred: $err', stack);
+			onError?.call('ConnectMe socket error has occurred: $err', stack);
 		});
 	}
 
