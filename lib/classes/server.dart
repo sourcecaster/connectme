@@ -1,8 +1,9 @@
 part of connectme;
 
 class ConnectMeServer {
-	ConnectMeServer._(this.address, this.port, this._clientFactory, this.onLog, this.onError, this.onConnect, this.onDisconnect);
+	ConnectMeServer._(this.address, this.port, this._clientFactory, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
+	final PackMe _packMe;
 	final InternetAddress address;
 	final int port;
 	late final HttpServer? httpServer;
@@ -31,6 +32,7 @@ class ConnectMeServer {
 				final WebSocket socket = await WebSocketTransformer.upgrade(request);
 				final ConnectMeClient client = _clientFactory != null ? _clientFactory!(socket, request.headers) : ConnectMeClient(socket, request.headers);
 				client._server = this;
+				client._packMe = _packMe;
 				client.onLog = onLog;
 				client.onError = onError;
 				client.onConnect = onConnect;
@@ -40,6 +42,10 @@ class ConnectMeServer {
 			});
 			onLog?.call('ConnectMe server is running on: ${httpServer!.address.address}${address.type != InternetAddressType.unix ? ' port ${httpServer!.port}' : ''}');
 		}
+	}
+
+	void register(Map<int, PackMeMessage Function()> messageFactory) {
+		_packMe.register(messageFactory);
 	}
 
 	void broadcast(dynamic data, {bool Function(ConnectMeClient)? where}) {

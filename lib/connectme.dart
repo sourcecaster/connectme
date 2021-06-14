@@ -3,6 +3,7 @@ library connectme;
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:packme/packme.dart';
 
 part 'classes/client.dart';
 part 'classes/server.dart';

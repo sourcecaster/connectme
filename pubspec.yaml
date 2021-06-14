@@ -6,6 +6,5 @@ environment:
   sdk: ">=2.12.0 <3.0.0"
 
 dependencies:
-
-dev_dependencies:
-
+  packme:
+    git: https://github.com/MadSheogorath/packme.git

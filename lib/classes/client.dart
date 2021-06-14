@@ -5,8 +5,9 @@ class ConnectMeClient {
 		_listenSocket(asServer: true);
 	}
 
-	ConnectMeClient._(this.url, this.requestHeaders, this._autoReconnect, this.onLog, this.onError, this.onConnect, this.onDisconnect);
+	ConnectMeClient._(this.url, this.requestHeaders, this._autoReconnect, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
+	late final PackMe _packMe;
 	final String url;
 	final bool _autoReconnect;
 	bool _applyReconnect = true;
@@ -40,7 +41,7 @@ class ConnectMeClient {
 	void _listenSocket({required bool asServer}) {
 		socket.listen((dynamic data) {
 			if (data is Uint8List) {
-				final PackMeMessage? message = _server._packMe.unpack(data);
+				final PackMeMessage? message = _packMe.unpack(data);
 				if (message != null) data = message;
 			}
 			if (_server._handlers[data.runtimeType] != null) {
@@ -66,8 +67,12 @@ class ConnectMeClient {
 		});
 	}
 
+	void register(Map<int, PackMeMessage Function()> messageFactory) {
+		_packMe.register(messageFactory);
+	}
+
 	void send(dynamic data) {
-		if (data is PackMeMessage) data = _server._packMe.pack(data);
+		if (data is PackMeMessage) data = _packMe.pack(data);
 		else if (data is! Uint8List && data is! String) {
 			onError?.call('Unsupported data type for Client.send, only PackMeMessage, Uint8List and String are supported');
 			return;
