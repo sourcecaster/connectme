@@ -60,7 +60,7 @@ Future<void> connectSaySomethingAndDisconnect() async {
 Future<void> main() async {
 	final Random rand = Random();
 	/// ConnectMeServer supports both ip address and unix named sockets.
-	final ConnectMeServer<CustomClient> server = await ConnectMe.listen(InternetAddress('127.0.0.1'),
+	final ConnectMeServer<CustomClient> server = await ConnectMe.listen<CustomClient>(InternetAddress('127.0.0.1'),
 		port: 31337,
 		onLog: logMessage,
 		onError: logError,
