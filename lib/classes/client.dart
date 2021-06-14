@@ -22,7 +22,7 @@ class ConnectMeClient {
 	late final Function? onConnect;
 	late final Function? onDisconnect;
 
-	Future<void> _init() async {
+	Future<void> connect() async {
 		await onLog?.call('Connecting to $url...');
 		socket = await WebSocket.connect(url, headers: requestHeaders);
 		onConnect?.call();
@@ -61,7 +61,7 @@ class ConnectMeClient {
 				onDisconnect?.call();
 				if (_autoReconnect && _applyReconnect) {
 					onError?.call('Connection to $url was closed, reconnect in 3 second...');
-					Timer(const Duration(seconds: 3), _init);
+					Timer(const Duration(seconds: 3), connect);
 				}
 				else onLog?.call('Disconnected from $url');
 			}

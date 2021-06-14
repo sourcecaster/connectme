@@ -16,7 +16,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	final Function(C)? onConnect;
 	final Function(C)? onDisconnect;
 
-	Future<void> _init() async {
+	Future<void> serve() async {
 		if (address.type == InternetAddressType.unix) {
 			onLog?.call('Starting ConnectMe server using unix named socket...');
 			final File socketFile = File(address.address);

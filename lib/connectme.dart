@@ -9,7 +9,18 @@ part 'classes/client.dart';
 part 'classes/server.dart';
 
 class ConnectMe {
-	static Future<ConnectMeServer<C>> listen<C extends ConnectMeClient>(InternetAddress address, {
+	static ConnectMeServer<C> server<C extends ConnectMeClient>(InternetAddress address, {
+		int port = 0,
+		C Function(WebSocket, HttpHeaders)? clientFactory,
+		Function(String)? onLog,
+		Function(String, [StackTrace])? onError,
+		Function(C)? onConnect,
+		Function(C)? onDisconnect,
+	}) {
+		return ConnectMeServer<C>._(address, port, clientFactory, onLog, onError, onConnect, onDisconnect);
+	}
+
+	static Future<ConnectMeServer<C>> serve<C extends ConnectMeClient>(InternetAddress address, {
 		int port = 0,
 		C Function(WebSocket, HttpHeaders)? clientFactory,
 		Function(String)? onLog,
@@ -18,8 +29,19 @@ class ConnectMe {
 		Function(C)? onDisconnect,
 	}) async {
 		final ConnectMeServer<C> server = ConnectMeServer<C>._(address, port, clientFactory, onLog, onError, onConnect, onDisconnect);
-		await server._init();
+		await server.serve();
 		return server;
+	}
+
+	static ConnectMeClient client(String url, {
+		Map<String, dynamic> headers = const <String, dynamic>{},
+		bool autoReconnect = true,
+		Function(String)? onLog,
+		Function(String, [StackTrace])? onError,
+		Function()? onConnect,
+		Function()? onDisconnect,
+	}) {
+		return ConnectMeClient._(url, headers, autoReconnect, onLog, onError, onConnect, onDisconnect);
 	}
 
 	static Future<ConnectMeClient> connect(String url, {
@@ -31,7 +53,7 @@ class ConnectMe {
 		Function()? onDisconnect,
 	}) async {
 		final ConnectMeClient client = ConnectMeClient._(url, headers, autoReconnect, onLog, onError, onConnect, onDisconnect);
-		await client._init();
+		await client.connect();
 		return client;
 	}
 }
