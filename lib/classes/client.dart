@@ -1,22 +1,30 @@
 part of connectme;
 
+class _Query<T> {
+	_Query(this.completer) : time = DateTime.now().millisecondsSinceEpoch;
+	final Completer<T> completer;
+	final int time;
+}
+
 class ConnectMeClient {
 	ConnectMeClient(this.socket, this.headers) : url = '', _autoReconnect = false, requestHeaders = const <String, dynamic>{} {
 		_listenSocket(asServer: true);
 	}
 
-	ConnectMeClient._(this.url, this.requestHeaders, this._autoReconnect, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
+	ConnectMeClient._(this.url, this.requestHeaders, this._autoReconnect, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
 	late final PackMe _packMe;
 	final String url;
 	final bool _autoReconnect;
 	bool _applyReconnect = true;
+	late final int queryTimeout;
 	late final ConnectMeServer<ConnectMeClient> _server;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
 	late WebSocket socket;
 	late final HttpHeaders headers;
 	final Map<String, dynamic> requestHeaders;
-	final Map<int, Completer<PackMeMessage>> queries = <int, Completer<PackMeMessage>>{};
+	final Map<int, _Query<PackMeMessage>> queries = <int, _Query<PackMeMessage>>{};
+	Timer? queriesTimer;
 
 	late final Function(String)? onLog;
 	late final Function(String, [StackTrace])? onError;
@@ -24,11 +32,25 @@ class ConnectMeClient {
 	late final Function? onDisconnect;
 
 	Future<void> connect() async {
+		_applyReconnect = true;
+		queriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) => _checkQueriesTimeout());
 		await onLog?.call('Connecting to $url...');
 		socket = await WebSocket.connect(url, headers: requestHeaders);
 		onConnect?.call();
 		await onLog?.call('Connection established');
 		_listenSocket(asServer: false);
+	}
+
+	void _checkQueriesTimeout({bool cancelDueToClose = false}) {
+		final List<int> keys = queries.keys.toList();
+		final int now = DateTime.now().millisecondsSinceEpoch;
+		for (final int transactionId in keys) {
+			if (now - queries[transactionId]!.time >= queryTimeout * 1000 || cancelDueToClose) {
+				final Completer<PackMeMessage> completer = queries[transactionId]!.completer;
+				queries.remove(transactionId);
+				completer.completeError('ConnectMe client.query() ${cancelDueToClose ? 'cancelled due to socket close' : 'response timed out'}');
+			}
+		}
 	}
 
 	Future<void> _processHandler(Function handler, dynamic data, [ConnectMeClient? client]) async {
@@ -48,7 +70,7 @@ class ConnectMeClient {
 				if (message != null) {
 					final int transactionId = message.$transactionId;
 					if (queries[transactionId] != null) {
-						final Completer<PackMeMessage> completer = queries[transactionId]!;
+						final Completer<PackMeMessage> completer = queries[transactionId]!.completer;
 						queries.remove(transactionId);
 						completer.complete(message);
 						return;
@@ -63,6 +85,7 @@ class ConnectMeClient {
 				for (final Function handler in _server._handlers[data.runtimeType]!) _processHandler(handler, data, this);
 			}
 		}, onDone: () {
+			_checkQueriesTimeout(cancelDueToClose: true);
 			if (asServer) {
 				_server.clients.remove(this);
 				onDisconnect?.call(this);
@@ -90,14 +113,14 @@ class ConnectMeClient {
 			onError?.call('Unsupported data type for Client.send(), only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
-		if (data != null) socket.add(data);
+		if (data != null && socket.readyState == WebSocket.open) socket.add(data);
 	}
 
 	Future<T> query<T extends PackMeMessage>(PackMeMessage message) {
 		final Completer<T> completer = Completer<T>();
 		final Uint8List? data = _packMe.pack(message);
-		if (data != null) {
-			queries[message.$transactionId] = completer;
+		if (data != null && socket.readyState == WebSocket.open) {
+			queries[message.$transactionId] = _Query<T>(completer);
 			socket.add(data);
 		}
 		else {
@@ -116,6 +139,11 @@ class ConnectMeClient {
 	}
 
 	Future<void> close() async {
+		if (queriesTimer != null) {
+			queriesTimer!.cancel();
+			queriesTimer = null;
+		}
+		_handlers.clear();
 		_applyReconnect = false;
 		await socket.close();
 	}

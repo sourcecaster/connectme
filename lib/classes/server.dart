@@ -1,15 +1,17 @@
 part of connectme;
 
 class ConnectMeServer<C extends ConnectMeClient> {
-	ConnectMeServer._(this.address, this.port, this._clientFactory, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
+	ConnectMeServer._(this.address, this.port, this._clientFactory, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
 	final PackMe _packMe;
 	final InternetAddress address;
 	final int port;
+	final int queryTimeout;
 	late final HttpServer? httpServer;
 	final List<C> clients = <C>[];
 	final C Function(WebSocket, HttpHeaders)? _clientFactory;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
+	Timer? clientsQueriesTimer;
 
 	final Function(String)? onLog;
 	final Function(String, [StackTrace])? onError;
@@ -17,6 +19,9 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	final Function(C)? onDisconnect;
 
 	Future<void> serve() async {
+		clientsQueriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+			for (final C client in clients) client._checkQueriesTimeout();
+		});
 		if (address.type == InternetAddressType.unix) {
 			onLog?.call('Starting ConnectMe server using unix named socket...');
 			final File socketFile = File(address.address);
@@ -33,6 +38,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 				final C client = _clientFactory != null ? _clientFactory!(socket, request.headers) : ConnectMeClient(socket, request.headers) as C;
 				client._server = this;
 				client._packMe = _packMe;
+				client.queryTimeout = queryTimeout;
 				client.onLog = onLog;
 				client.onError = onError;
 				client.onConnect = onConnect;
@@ -56,7 +62,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 		}
 		for (final C client in clients) {
 			if (where != null && !where(client)) continue;
-			if (data != null) client.socket.add(data);
+			if (data != null && client.socket.readyState == WebSocket.open) client.socket.add(data);
 		}
 	}
 
@@ -70,6 +76,10 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	}
 
 	Future<void> close() async {
+		if (clientsQueriesTimer != null) {
+			clientsQueriesTimer!.cancel();
+			clientsQueriesTimer = null;
+		}
 		for (int i = clients.length - 1; i >= 0; i--) {
 			await clients[i].socket.close();
 		}
