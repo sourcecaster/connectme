@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:packme/packme.dart';
 
 class HowAreYouRequest extends PackMeMessage {
@@ -6,26 +5,32 @@ class HowAreYouRequest extends PackMeMessage {
 	late int number;
 	
 	@override
-	int estimate() {
-		reset();
-		int bytes = 6;
-		bytes += stringBytes(name);
+	HowAreYouResponse get $response {
+		final HowAreYouResponse message = HowAreYouResponse();
+		message.$request = this;
+		return message;
+	}
+	
+	@override
+	int $estimate() {
+		$reset();
+		int bytes = 10;
+		bytes += $stringBytes(name);
 		return bytes;
 	}
 	
 	@override
-	void pack() {
-		data = Uint8List(estimate());
-		packUint32(643804858);
-		packString(name);
-		packUint16(number);
+	void $pack() {
+		$initPack(643804858);
+		$packString(name);
+		$packUint16(number);
 	}
 	
 	@override
-	void unpack() {
-		unpackUint32();
-		name = unpackString();
-		number = unpackUint16();
+	void $unpack() {
+		$initUnpack();
+		name = $unpackString();
+		number = $unpackUint16();
 	}
 	
 }
@@ -35,26 +40,25 @@ class HowAreYouResponse extends PackMeMessage {
 	late double squareRoot;
 	
 	@override
-	int estimate() {
-		reset();
-		int bytes = 12;
-		bytes += stringBytes(answer);
+	int $estimate() {
+		$reset();
+		int bytes = 16;
+		bytes += $stringBytes(answer);
 		return bytes;
 	}
 	
 	@override
-	void pack() {
-		data = Uint8List(estimate());
-		packUint32(595126750);
-		packString(answer);
-		packDouble(squareRoot);
+	void $pack() {
+		$initPack(595126750);
+		$packString(answer);
+		$packDouble(squareRoot);
 	}
 	
 	@override
-	void unpack() {
-		unpackUint32();
-		answer = unpackString();
-		squareRoot = unpackDouble();
+	void $unpack() {
+		$initUnpack();
+		answer = $unpackString();
+		squareRoot = $unpackDouble();
 	}
 	
 }

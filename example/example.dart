@@ -41,7 +41,7 @@ Future<void> connectSaySomethingAndDisconnect() async {
 	client.listen<HowAreYouRequest>((HowAreYouRequest data) async {
 		final String myName = data.name;
 		final int numberToCalcRootFrom = data.number;
-		final HowAreYouResponse response = HowAreYouResponse()
+		final HowAreYouResponse response = data.$response
 			..answer = '$numberToCalcRootFrom you say? $myName knows the answer, check it out.'
 			..squareRoot = sqrt(numberToCalcRootFrom);
 		await Future<void>.delayed(const Duration(seconds: 1));
@@ -91,14 +91,18 @@ Future<void> main() async {
 			..name = client.name
 			..number = rand.nextInt(65536);
 		logMessage("How are you, ${client.name}? Tell me what's the square root of ${request.number}?");
-		client.send(request);
+		final HowAreYouResponse response = await client.query<HowAreYouResponse>(request);
+		logMessage('${client.name} says: ${response.answer}');
+		logMessage("And his answer is absolutely correct! It's ${response.squareRoot}!");
 	});
 
-	/// Add global PackMe HowAreYouResponse message listener.
-	server.listen<HowAreYouResponse>((HowAreYouResponse data, CustomClient client) async {
-		logMessage('${client.name} says: ${data.answer}');
-		logMessage("And his answer is absolutely correct! It's ${data.squareRoot}!");
-	});
+	/// We could add global PackMe HowAreYouResponse message listener and use
+	/// client.send() instead of client.query(). The result would be pretty the
+	/// same though it's a different approach.
+	// server.listen<HowAreYouResponse>((HowAreYouResponse data, CustomClient client) async {
+	// 	logMessage('${client.name} says: ${data.answer}');
+	// 	logMessage("And his answer is absolutely correct! It's ${data.squareRoot}!");
+	// });
 
 	/// Every 5 seconds we'll connect to 127.0.0.1, send String message,
 	/// PackeMeMessage and disconnect.

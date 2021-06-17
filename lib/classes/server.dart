@@ -51,7 +51,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	void broadcast(dynamic data, {bool Function(C)? where}) {
 		if (data is PackMeMessage) data = _packMe.pack(data);
 		else if (data is! Uint8List && data is! String) {
-			onError?.call('Unsupported data type for ConnectMe.broadcast, only PackMeMessage, Uint8List and String are supported');
+			onError?.call('Unsupported data type for ConnectMe.broadcast(), only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
 		for (final C client in clients) {

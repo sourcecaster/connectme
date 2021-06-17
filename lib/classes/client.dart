@@ -16,6 +16,7 @@ class ConnectMeClient {
 	late WebSocket socket;
 	late final HttpHeaders headers;
 	final Map<String, dynamic> requestHeaders;
+	final Map<int, Completer<PackMeMessage>> queries = <int, Completer<PackMeMessage>>{};
 
 	late final Function(String)? onLog;
 	late final Function(String, [StackTrace])? onError;
@@ -44,13 +45,22 @@ class ConnectMeClient {
 		socket.listen((dynamic data) {
 			if (data is Uint8List) {
 				final PackMeMessage? message = _packMe.unpack(data);
-				if (message != null) data = message;
-			}
-			if (asServer && _server._handlers[data.runtimeType] != null) {
-				for (final Function handler in _server._handlers[data.runtimeType]!) _processHandler(handler, data, this);
+				if (message != null) {
+					final int transactionId = message.$transactionId;
+					if (queries[transactionId] != null) {
+						final Completer<PackMeMessage> completer = queries[transactionId]!;
+						queries.remove(transactionId);
+						completer.complete(message);
+						return;
+					}
+					data = message;
+				}
 			}
 			if (_handlers[data.runtimeType] != null) {
 				for (final Function handler in _handlers[data.runtimeType]!) _processHandler(handler, data);
+			}
+			if (asServer && _server._handlers[data.runtimeType] != null) {
+				for (final Function handler in _server._handlers[data.runtimeType]!) _processHandler(handler, data, this);
 			}
 		}, onDone: () {
 			if (asServer) {
@@ -77,10 +87,23 @@ class ConnectMeClient {
 	void send(dynamic data) {
 		if (data is PackMeMessage) data = _packMe.pack(data);
 		else if (data is! Uint8List && data is! String) {
-			onError?.call('Unsupported data type for Client.send, only PackMeMessage, Uint8List and String are supported');
+			onError?.call('Unsupported data type for Client.send(), only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
 		if (data != null) socket.add(data);
+	}
+
+	Future<T> query<T extends PackMeMessage>(PackMeMessage message) {
+		final Completer<T> completer = Completer<T>();
+		final Uint8List? data = _packMe.pack(message);
+		if (data != null) {
+			queries[message.$transactionId] = completer;
+			socket.add(data);
+		}
+		else {
+			onError?.call("ConnectMe client.query() failed to pack message, future won't be resolved");
+		}
+		return completer.future;
 	}
 
 	void listen<T>(Future<void> Function(T) handler) {
