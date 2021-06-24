@@ -62,7 +62,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 		}
 		for (final C client in clients) {
 			if (where != null && !where(client)) continue;
-			if (data != null && client.socket.readyState == WebSocket.open) client.socket.add(data);
+			if (data != null && client.socket?.readyState == WebSocket.open) client.socket!.add(data);
 		}
 	}
 
@@ -81,7 +81,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 			clientsQueriesTimer = null;
 		}
 		for (int i = clients.length - 1; i >= 0; i--) {
-			await clients[i].socket.close();
+			await clients[i].socket?.close();
 		}
 		await httpServer?.close();
 	}
