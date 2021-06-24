@@ -20,7 +20,7 @@ class ConnectMeClient {
 	late final int queryTimeout;
 	late final ConnectMeServer<ConnectMeClient> _server;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
-	late WebSocket socket;
+	WebSocket? socket;
 	late final HttpHeaders headers;
 	final Map<String, dynamic> requestHeaders;
 	final Map<int, _Query<PackMeMessage>> queries = <int, _Query<PackMeMessage>>{};
@@ -64,7 +64,7 @@ class ConnectMeClient {
 	}
 
 	void _listenSocket({required bool asServer}) {
-		socket.listen((dynamic data) {
+		socket?.listen((dynamic data) {
 			if (data is Uint8List) {
 				final PackMeMessage? message = _packMe.unpack(data);
 				if (message != null) {
@@ -113,15 +113,15 @@ class ConnectMeClient {
 			onError?.call('Unsupported data type for Client.send(), only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
-		if (data != null && socket.readyState == WebSocket.open) socket.add(data);
+		if (data != null && socket?.readyState == WebSocket.open) socket!.add(data);
 	}
 
 	Future<T> query<T extends PackMeMessage>(PackMeMessage message) {
 		final Completer<T> completer = Completer<T>();
 		final Uint8List? data = _packMe.pack(message);
-		if (data != null && socket.readyState == WebSocket.open) {
+		if (data != null && socket?.readyState == WebSocket.open) {
 			queries[message.$transactionId] = _Query<T>(completer);
-			socket.add(data);
+			socket!.add(data);
 		}
 		else {
 			onError?.call("ConnectMe client.query() failed to pack message, future won't be resolved");
@@ -145,6 +145,6 @@ class ConnectMeClient {
 		}
 		_handlers.clear();
 		_applyReconnect = false;
-		await socket.close();
+		await socket?.close();
 	}
 }
