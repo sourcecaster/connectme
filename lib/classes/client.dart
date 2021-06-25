@@ -78,11 +78,12 @@ class ConnectMeClient {
 					data = message;
 				}
 			}
-			if (_handlers[data.runtimeType] != null) {
-				for (final Function handler in _handlers[data.runtimeType]!) _processHandler(handler, data);
+			final Type type = data is Uint8List ? Uint8List : data.runtimeType;
+			if (_handlers[type] != null) {
+				for (final Function handler in _handlers[type]!) _processHandler(handler, data);
 			}
-			if (asServer && _server._handlers[data.runtimeType] != null) {
-				for (final Function handler in _server._handlers[data.runtimeType]!) _processHandler(handler, data, this);
+			if (asServer && _server._handlers[type] != null) {
+				for (final Function handler in _server._handlers[type]!) _processHandler(handler, data, this);
 			}
 		}, onDone: () {
 			_checkQueriesTimeout(cancelDueToClose: true);
