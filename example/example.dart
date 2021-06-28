@@ -41,9 +41,10 @@ Future<void> connectSaySomethingAndDisconnect() async {
 	client.listen<HowAreYouRequest>((HowAreYouRequest data) async {
 		final String myName = data.name;
 		final int numberToCalcRootFrom = data.number;
-		final HowAreYouResponse response = data.$response
-			..answer = '$numberToCalcRootFrom you say? $myName knows the answer, check it out.'
-			..squareRoot = sqrt(numberToCalcRootFrom);
+		final HowAreYouResponse response = data.$response(
+			answer: '$numberToCalcRootFrom you say? $myName knows the answer, check it out.',
+			squareRoot: sqrt(numberToCalcRootFrom),
+		);
 		await Future<void>.delayed(const Duration(seconds: 1));
 		client.send(response);
 	});
@@ -87,9 +88,10 @@ Future<void> main() async {
 
 		/// Once we've got hello message from the client, send him a PackMe
 		/// HowAreYouRequest message.
-		final HowAreYouRequest request = HowAreYouRequest()
-			..name = client.name
-			..number = rand.nextInt(65536);
+		final HowAreYouRequest request = HowAreYouRequest(
+			name: client.name,
+			number: rand.nextInt(65536),
+		);
 		logMessage("How are you, ${client.name}? Tell me what's the square root of ${request.number}?");
 		final HowAreYouResponse response = await client.query<HowAreYouResponse>(request);
 		logMessage('${client.name} says: ${response.answer}');
