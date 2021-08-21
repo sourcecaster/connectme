@@ -7,4 +7,4 @@ environment:
 
 dependencies:
   packme:
-    git: https://github.com/MadSheogorath/packme.git
+    git: https://github.com/sourcecaster/packme.git
