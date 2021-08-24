@@ -1,10 +1,13 @@
 name: connectme
-description: Framework for console server applications
-version: 0.0.1
+description: WebSocket connection management library to handle client-server communication in event-based manner or await-query style (using PackMe messages).
+version: 1.0.0
+homepage: https://github.com/sourcecaster/connectme
+repository: https://github.com/sourcecaster/connectme
+issue_tracker: https://github.com/sourcecaster/connectme/issues
+documentation: https://github.com/sourcecaster/connectme
 
 environment:
   sdk: ">=2.13.0 <3.0.0"
 
-dependencies:
-  packme:
-    git: https://github.com/sourcecaster/packme.git
+dependencies: 
+  packme: ^1.1.4

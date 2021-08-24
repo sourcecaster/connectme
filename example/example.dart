@@ -108,7 +108,7 @@ Future<void> main() async {
 
 	/// Every 5 seconds we'll connect to 127.0.0.1, send String message,
 	/// PackeMeMessage and disconnect.
-	Timer.periodic(const Duration(seconds: 5), (_) {
+	Timer(const Duration(seconds: 5), () {
 		connectSaySomethingAndDisconnect();
 	});
 	logMessage('Wait for 5 seconds and someone will connect for sure.');

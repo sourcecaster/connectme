@@ -5,7 +5,7 @@ class HowAreYouResponse extends PackMeMessage {
 		required this.answer,
 		required this.squareRoot,
 	});
-	HowAreYouResponse._empty();
+	HowAreYouResponse.$empty();
 
 	late String answer;
 	late double squareRoot;
@@ -43,7 +43,7 @@ class HowAreYouRequest extends PackMeMessage {
 		required this.name,
 		required this.number,
 	});
-	HowAreYouRequest._empty();
+	HowAreYouRequest.$empty();
 
 	late String name;
 	late int number;
@@ -86,6 +86,6 @@ class HowAreYouRequest extends PackMeMessage {
 }
 
 final Map<int, PackMeMessage Function()> manifestMessageFactory = <int, PackMeMessage Function()>{
-	595126750: () => HowAreYouResponse._empty(),
-	643804858: () => HowAreYouRequest._empty(),
+	595126750: () => HowAreYouResponse.$empty(),
+	643804858: () => HowAreYouRequest.$empty(),
 };

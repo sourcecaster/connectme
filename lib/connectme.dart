@@ -5,8 +5,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:packme/packme.dart';
 
-part 'classes/client.dart';
-part 'classes/server.dart';
+part 'src/client.dart';
+part 'src/server.dart';
 
 class ConnectMe {
 	static ConnectMeServer<C> server<C extends ConnectMeClient>(InternetAddress address, {
