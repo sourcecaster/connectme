@@ -1,12 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:connectme/connectme.dart';
 import 'generated/manifest.generated.dart';
-
-/// We'll use it to randomly assign a name to every new client.
-
-const List<String> clientCodeNames = <String>['Bob', 'Maria', 'Peter', 'Max', 'Ron', 'Steve', 'Richard', 'Alice'];
 
 /// Most probably you'll use your own log and error handler systems. So the good
 /// news are: you can pass those handlers to ConnectMe (onLog, onError).
@@ -23,93 +18,125 @@ void logError(String error, [StackTrace? stack]) {
 /// This custom client class is used to replace standard ConnectMeClient class
 /// in ConnectMeServer (using classFactory argument).
 
-class CustomClient extends ConnectMeClient {
-	CustomClient(WebSocket socket, HttpHeaders headers) : super(socket, headers);
+class CustomServerClient extends ConnectMeClient {
+	CustomServerClient(WebSocket socket, HttpHeaders headers) : super(socket, headers);
 	late final String name;
+	late final int age;
 }
 
-/// Create client, connect, say something, disconnect.
+/// Create server, which will wait for message from connected clients then send
+/// them a request to do some math operation.
 
-Future<void> connectSaySomethingAndDisconnect() async {
-	final ConnectMeClient client = await ConnectMe.connect('ws://127.0.0.1:31337');
-
-	/// Register PackMe messages from generated/manifest.generated.dart in order
-	/// to make client able to process them.
-	client.register(manifestMessageFactory);
-
-	/// Listen for HowAreYouRequest message and reply.
-	client.listen<HowAreYouRequest>((HowAreYouRequest data) async {
-		final String myName = data.name;
-		final int numberToCalcRootFrom = data.number;
-		final HowAreYouResponse response = data.$response(
-			answer: '$numberToCalcRootFrom you say? $myName knows the answer, check it out.',
-			squareRoot: sqrt(numberToCalcRootFrom),
-		);
-		await Future<void>.delayed(const Duration(seconds: 1));
-		client.send(response);
-	});
-	await Future<void>.delayed(const Duration(seconds: 1));
-
-	/// Say hello and wait before closing connection.
-	client.send('Hello there!');
-	await Future<void>.delayed(const Duration(seconds: 2));
-	client.close();
-}
-
-/// Example entry point.
-
-Future<void> main() async {
+Future<void> createTestServer() async {
 	final Random rand = Random();
+	late final ConnectMeServer<CustomServerClient> server;
 	/// ConnectMeServer supports both ip address and unix named sockets.
-	final ConnectMeServer<CustomClient> server = await ConnectMe.serve<CustomClient>(InternetAddress('127.0.0.1'),
+	server = await ConnectMe.serve<CustomServerClient>(InternetAddress('127.0.0.1'),
 		port: 31337,
 		onLog: logMessage,
 		onError: logError,
-		onConnect: (CustomClient client) {
-			/// Assign a random name to our client.
-			final String name = clientCodeNames[rand.nextInt(clientCodeNames.length)];
-			client.name = name;
-			logMessage('\nA client from ${client.headers.host} has connected :) Hello, ${client.name}!');
+		onConnect: (CustomServerClient client) {
+			logMessage('\n[SERVER]: A client from ${client.headers.host} has connected.');
 		},
-		onDisconnect: (CustomClient client) {
-			logMessage('A client named ${client.name} has disconnected :(');
+		onDisconnect: (CustomServerClient client) {
+			logMessage('[SERVER]: A client ${client.name} has disconnected.');
+			server.close();
 		},
 		/// Client factory returns our inherited class instance.
-		clientFactory: (_, __) => CustomClient(_, __),
+		clientFactory: (_, __) => CustomServerClient(_, __),
 	);
 
 	/// Register PackMe messages from generated/manifest.generated.dart in order
 	/// to make server able to process them.
 	server.register(manifestMessageFactory);
 
-	/// Add global server String message listener.
-	server.listen<String>((String message, CustomClient client) async {
-		logMessage('${client.name} says: $message');
+	/// Add global server String message listener. Once we get message, reply
+	/// with String message and add new message listener for this client only.
+	server.listen<String>((String message, CustomServerClient client) async {
+		logMessage('[SERVER]: received message from client: $message');
+		await Future<void>.delayed(const Duration(milliseconds: 500)); // We're thinking :)
+		client.send('Hello sir! Could you please introduce yourself using PackMe message?');
 
-		/// Once we've got hello message from the client, send him a PackMe
-		/// HowAreYouRequest message.
-		final HowAreYouRequest request = HowAreYouRequest(
-			name: client.name,
-			number: rand.nextInt(65536),
-		);
-		logMessage("How are you, ${client.name}? Tell me what's the square root of ${request.number}?");
-		final HowAreYouResponse response = await client.query<HowAreYouResponse>(request);
-		logMessage('${client.name} says: ${response.answer}');
-		logMessage("And his answer is absolutely correct! It's ${response.squareRoot}!");
+		/// Now listen for specific PackMe message from this client.
+		client.listen<IntroductionMessage>((IntroductionMessage message) async {
+			logMessage('[SERVER]: received $message');
+			/// This IntroductionMessage contains two fields: name and age.
+			client.name = message.name;
+			client.age = message.age;
+			logMessage('[SERVER]: ok, this is ${client.name} and he is ${client.age} years old. Gonna ask him to do some math...');
+			await Future<void>.delayed(const Duration(milliseconds: 500)); // We're thinking :)
+
+			/// Now we'll send MathQuestionsRequest which contains two numbers
+			/// and math operation. Expecting to get MathQuestionResponse.
+			final MathQuestionResponse response = await client.query<MathQuestionResponse>(MathQuestionRequest(
+				operation: MathOperation.values[rand.nextInt(MathOperation.values.length)],
+				x: rand.nextInt(100),
+				y: rand.nextInt(100),
+			));
+			logMessage('[SERVER]: received $response');
+			logMessage("[SERVER]: the answer is ${response.result}. That's it.");
+		});
+	});
+}
+
+/// Create client, connect, send "Hello!" message, reply to server messages,
+/// disconnect.
+
+Future<void> createTestClient() async {
+	final ConnectMeClient client = await ConnectMe.connect('ws://127.0.0.1:31337');
+
+	/// Register PackMe messages from generated/manifest.generated.dart in order
+	/// to make client able to process them.
+	client.register(manifestMessageFactory);
+	await Future<void>.delayed(const Duration(seconds: 1)); // We're thinking :)
+
+	/// Say "Hello" and listen for String message from server. Then reply with
+	/// IntroductionMessage.
+	/// Note: client.send() and client.listen<T>() methods support String,
+	/// PackMe messages or Uint8List.
+	client.send('Hello!');
+	client.listen<String>((String message) async {
+		logMessage('[CLIENT]: server says: "$message"');
+		await Future<void>.delayed(const Duration(seconds: 1)); // We're thinking :)
+		client.send(IntroductionMessage(
+			name: 'Eli Vance',
+			age: 44,
+		));
 	});
 
-	/// We could add global PackMe HowAreYouResponse message listener and use
-	/// client.send() instead of client.query(). The result would be pretty the
-	/// same though it's a different approach.
-	// server.listen<HowAreYouResponse>((HowAreYouResponse data, CustomClient client) async {
-	// 	logMessage('${client.name} says: ${data.answer}');
-	// 	logMessage("And his answer is absolutely correct! It's ${data.squareRoot}!");
-	// });
+	/// Listen for MathOperationRequest message and reply.
+	client.listen<MathQuestionRequest>((MathQuestionRequest request) async {
+		logMessage('[CLIENT]: received: "$request"');
+		logMessage('[CLIENT]: they want us to do some math, okay...');
+		await Future<void>.delayed(const Duration(seconds: 1)); // We're thinking :)
+		double result;
+		switch (request.operation) {
+			case MathOperation.add:
+				result = request.x.toDouble() + request.y.toDouble();
+				break;
+			case MathOperation.subtract:
+				result = request.x.toDouble() - request.y.toDouble();
+				break;
+			case MathOperation.multiply:
+				result = request.x.toDouble() * request.y.toDouble();
+				break;
+			case MathOperation.divide:
+				result = request.x.toDouble() / request.y.toDouble();
+				break;
+		}
+		client.send(request.$response(result: result));
 
-	/// Every 5 seconds we'll connect to 127.0.0.1, send String message,
-	/// PackeMeMessage and disconnect.
-	Timer(const Duration(seconds: 5), () {
-		connectSaySomethingAndDisconnect();
+		/// Wait a bit and disconnect.
+		await Future<void>.delayed(const Duration(seconds: 2));
+		client.close();
 	});
-	logMessage('Wait for 5 seconds and someone will connect for sure.');
+}
+
+/// Example entry point. We'll create test server, then wait a few seconds and
+/// then create test client.
+
+Future<void> main() async {
+	await createTestServer();
+	await Future<void>.delayed(const Duration(seconds: 2));
+	await createTestClient();
 }

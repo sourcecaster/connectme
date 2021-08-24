@@ -1,12 +1,24 @@
 {
-	"how_are_you": [
+	"math_operation": [
+		"add",
+		"subtract",
+		"multiply",
+		"divide"
+	],
+	"introduction": [
 		{
 			"name": "string",
-			"number": "uint16"
+			"age": "uint8"
+		}
+	],
+	"math_question": [
+		{
+			"operation": "@math_operation",
+			"x": "uint8",
+			"y": "uint8"
 		},
 		{
-			"answer": "string",
-			"square_root": "double"
+			"result": "double"
 		}
 	]
 }

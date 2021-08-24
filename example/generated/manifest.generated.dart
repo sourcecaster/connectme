@@ -1,58 +1,99 @@
 import 'package:packme/packme.dart';
 
-class HowAreYouResponse extends PackMeMessage {
-	HowAreYouResponse({
-		required this.answer,
-		required this.squareRoot,
-	});
-	HowAreYouResponse.$empty();
+enum MathOperation {
+	add,
+	subtract,
+	multiply,
+	divide,
+}
 
-	late String answer;
-	late double squareRoot;
+class IntroductionMessage extends PackMeMessage {
+	IntroductionMessage({
+		required this.name,
+		required this.age,
+	});
+	IntroductionMessage.$empty();
+
+	late String name;
+	late int age;
 	
 	@override
 	int $estimate() {
 		$reset();
-		int bytes = 16;
-		bytes += $stringBytes(answer);
+		int bytes = 9;
+		bytes += $stringBytes(name);
 		return bytes;
 	}
 
 	@override
 	void $pack() {
-		$initPack(595126750);
-		$packString(answer);
-		$packDouble(squareRoot);
+		$initPack(377751248);
+		$packString(name);
+		$packUint8(age);
 	}
 
 	@override
 	void $unpack() {
 		$initUnpack();
-		answer = $unpackString();
-		squareRoot = $unpackDouble();
+		name = $unpackString();
+		age = $unpackUint8();
 	}
 
 	@override
 	String toString() {
-		return 'HowAreYouResponse\x1b[0m(answer: ${PackMe.dye(answer)}, squareRoot: ${PackMe.dye(squareRoot)})';
+		return 'IntroductionMessage\x1b[0m(name: ${PackMe.dye(name)}, age: ${PackMe.dye(age)})';
 	}
 }
 
-class HowAreYouRequest extends PackMeMessage {
-	HowAreYouRequest({
-		required this.name,
-		required this.number,
+class MathQuestionResponse extends PackMeMessage {
+	MathQuestionResponse({
+		required this.result,
 	});
-	HowAreYouRequest.$empty();
+	MathQuestionResponse.$empty();
 
-	late String name;
-	late int number;
+	late double result;
 	
-	HowAreYouResponse $response({
-		required String answer,
-		required double squareRoot,
+	@override
+	int $estimate() {
+		$reset();
+		int bytes = 16;
+		return bytes;
+	}
+
+	@override
+	void $pack() {
+		$initPack(142788393);
+		$packDouble(result);
+	}
+
+	@override
+	void $unpack() {
+		$initUnpack();
+		result = $unpackDouble();
+	}
+
+	@override
+	String toString() {
+		return 'MathQuestionResponse\x1b[0m(result: ${PackMe.dye(result)})';
+	}
+}
+
+class MathQuestionRequest extends PackMeMessage {
+	MathQuestionRequest({
+		required this.operation,
+		required this.x,
+		required this.y,
+	});
+	MathQuestionRequest.$empty();
+
+	late MathOperation operation;
+	late int x;
+	late int y;
+	
+	MathQuestionResponse $response({
+		required double result,
 	}) {
-		final HowAreYouResponse message = HowAreYouResponse(answer: answer, squareRoot: squareRoot);
+		final MathQuestionResponse message = MathQuestionResponse(result: result);
 		message.$request = this;
 		return message;
 	}
@@ -60,32 +101,34 @@ class HowAreYouRequest extends PackMeMessage {
 	@override
 	int $estimate() {
 		$reset();
-		int bytes = 10;
-		bytes += $stringBytes(name);
+		int bytes = 11;
 		return bytes;
 	}
 
 	@override
 	void $pack() {
-		$initPack(643804858);
-		$packString(name);
-		$packUint16(number);
+		$initPack(752154248);
+		$packUint8(operation.index);
+		$packUint8(x);
+		$packUint8(y);
 	}
 
 	@override
 	void $unpack() {
 		$initUnpack();
-		name = $unpackString();
-		number = $unpackUint16();
+		operation = MathOperation.values[$unpackUint8()];
+		x = $unpackUint8();
+		y = $unpackUint8();
 	}
 
 	@override
 	String toString() {
-		return 'HowAreYouRequest\x1b[0m(name: ${PackMe.dye(name)}, number: ${PackMe.dye(number)})';
+		return 'MathQuestionRequest\x1b[0m(operation: ${PackMe.dye(operation)}, x: ${PackMe.dye(x)}, y: ${PackMe.dye(y)})';
 	}
 }
 
 final Map<int, PackMeMessage Function()> manifestMessageFactory = <int, PackMeMessage Function()>{
-	595126750: () => HowAreYouResponse.$empty(),
-	643804858: () => HowAreYouRequest.$empty(),
+	377751248: () => IntroductionMessage.$empty(),
+	142788393: () => MathQuestionResponse.$empty(),
+	752154248: () => MathQuestionRequest.$empty(),
 };

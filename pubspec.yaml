@@ -5,9 +5,9 @@ homepage: https://github.com/sourcecaster/connectme
 repository: https://github.com/sourcecaster/connectme
 issue_tracker: https://github.com/sourcecaster/connectme/issues
 documentation: https://github.com/sourcecaster/connectme
-
 environment:
   sdk: ">=2.13.0 <3.0.0"
-
-dependencies: 
+dependencies:
   packme: ^1.1.4
+dev_dependencies:
+  test: ^1.17.11
