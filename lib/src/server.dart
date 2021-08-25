@@ -66,12 +66,12 @@ class ConnectMeServer<C extends ConnectMeClient> {
 		}
 	}
 
-	void listen<T>(Future<void> Function(T, C) handler) {
+	void listen<T>(Function(T, C) handler) {
 		if (_handlers[T] == null) _handlers[T] = <Function>[];
 		_handlers[T]!.add(handler);
 	}
 
-	void cancel<T>(Future<void> Function(T, C) handler) {
+	void cancel<T>(Function(T, C) handler) {
 		_handlers[T]?.remove(handler);
 	}
 

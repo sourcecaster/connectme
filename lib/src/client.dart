@@ -130,12 +130,12 @@ class ConnectMeClient {
 		return completer.future;
 	}
 
-	void listen<T>(Future<void> Function(T) handler) {
+	void listen<T>(Function(T) handler) {
 		if (_handlers[T] == null) _handlers[T] = <Function>[];
 		_handlers[T]!.add(handler);
 	}
 
-	void cancel<T>(Future<void> Function(T) handler) {
+	void cancel<T>(Function(T) handler) {
 		_handlers[T]?.remove(handler);
 	}
 
