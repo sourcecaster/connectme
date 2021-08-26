@@ -1,19 +1,20 @@
 ## What is ConnectMe
-WebSocket wrapper in conjunction with PackMe
-PackMe is a lightweight library for packing your data into binary buffer (presumably in order to be sent over TCP connection) and unpacking it back to class objects described in a simple way via JSON manifest files.
+ConnectMe is a lightweight library for working with WebSocket connections both on client and server sides. It allows you to:
+* create connections to WebSocket servers with different options (like autoReconnect, queryTimeout);
+* create WebSocket servers using any InternetAddress object;
+* manage connections on server side using default or your own Client class;
+* send messages of different data types: String, Uint8List or PackMe messages;
+* listen to any messages (including possibility to listen for specific client on server side);
+* asynchronously query data using [PackMe](https://pub.dev/packages/packme) messages: SomeResponse response = await client.query(SomeRequest());
+* broadcast messages to all clients or group of clients specified by criteria;
 
-## It is Fast
-Spoiler alert! ~500k pack/unpack cycles per second for data of average size and complexity. Of course it depends on system configuration :)
-
-Since PackMe generates .dart classes, there is no need for any resource demanding serialization/deserialization process. No intermediate steps involved, every class has it's own efficient methods to quickly put all data to Uint8List buffer and extract it. Comparing to popular solutions it's performance is similar to FlatBuffers and greatly outperforms Proto Buffers.
-
-## It is Simple
-No special file formats (like for FlatBuffers or Proto Buffers manifest files), just use JSON. Objects, types and messages declarations are very simple and intuitive.
+## It is integrated with PackMe 
+[PackMe](https://pub.dev/packages/packme) is an extremely fast binary serializer with built-in script for generating .dart classes from simple JSON manifest files. It provides an easy and efficient way to pack your class objects into binary buffers and vice versa. 
 
 ## Usage
-The best way of using it for client-server applications is by using ConnectMe package which provides all necessary stuff like adding message listeners, calling asynchronous queries etc. But you can use it separately as well.
+It is recommended to use [PackMe](https://pub.dev/packages/packme) messages for data exchange since it gives some important benefits such as clear communication protocol described in JSON, asynchronous queries support out of the box and small data packets size.
 
-Here's a simple manifest.json file (located in packme directory) for some hypothetical client-server application:
+Here's a simple manifest.json file (located in packme directory) for some hypothetical client-server application (see PackMe JSON manifest format documentation [here](https://pub.dev/packages/packme)):
 ```json
 {
     "get_user": [
@@ -33,176 +34,208 @@ Generate dart files:
 # Usage: dart run packme <json_manifests_dir> <generated_classes_dir>
 dart run packme packme generated
 ```
-Using on client side:
-```dart
-import 'generated/manifest.generated.dart';
-import 'package:packme/packme.dart';
-
-void main() {
-    // ... whatever code goes here
-
-    PackMe packMe = PackMe();
-    // Register class factory to make PackMe able to create class instances while unpacking messages
-    packMe.register(manifestMessageFactory);
-    
-    GetUserRequest request = GetUserRequest(id: 'a7db84cc2ef5012a6498bc64334ffa7d');
-    socket.send(packMe.pack(request)); // Some socket implementation
-    
-    socket.listen((Uint8List data) {
-        final PackMeMessage? message = packMe.unpack(data);
-        if (message is GetUserResponse) {
-            print('He is awesome: ${message.firstName} ${message.lastName}, ${message.age} y.o.');
-        }
-    });
-}
-```
 Using on server side:
 ```dart
 import 'generated/manifest.generated.dart';
-import 'package:packme/packme.dart';
+import 'package:connectme/connectme.dart';
 
-void main() {
-    // ... whatever code goes here
-
-    PackMe packMe = PackMe();
-    // Register class factory to make PackMe able to create class instances while unpacking messages
-    packMe.register(manifestMessageFactory);
+void main() async {
+    final ConnectMeServer server = await ConnectMe.serve(InternetAddress('127.0.0.1'),
+        port: 31337,
+        onConnect: (ConnectMeClient client) {
+            print('${client.headers.host} connected.');
+        },
+        onDisconnect: (ConnectMeClient client) {
+            print('${client.headers.host} disconnected.');
+        },
+    );
     
-    server.listen((Uint8List data, SomeSocket socket) { // Some server implementation
-        final PackMeMessage? message = packMe.unpack(data);
-        if (message is GetUserRequest) {
-            GetUserResponse response = GetUserResponse(
-                firstName: 'Peter',
-                lastName: 'Hollens',
-                age: 39,
-            );
-            // Or: GetUserResponse response = message.$response(
-            //     firstName: 'Peter',
-            //     lastName: 'Hollens',
-            //     age: 39,
-            // );
-            socket.send(packMe.pack(response));
-        }
+    // Listen for a String message and send reverse string back to client.
+    server.listen<String>((String message, ConnectMeClient client) {
+        client.send(message.split('').reversed.join(''));
+    });
+
+    // Register PackMe messages from manifest.generated.dart to be able to listen for them.
+    server.register(manifestMessageFactory);
+    
+    // Listen for GetUserRequest message and reply with GetUserResponse.
+    server.listen<GetUserRequest>((GetUserRequest request, ConnectMeClient client) {
+        // GetUserRequest.$response method returns GetUserResponse associated with current request.
+        final GetUserResponse response = request.$response(
+            firstName: 'Alyx',
+            lastName: 'Vance',
+            age: 19,
+        );
     });
 }
 ```
+Using on client side:
+```dart
+import 'generated/manifest.generated.dart';
+import 'package:connectme/connectme.dart';
 
-## Messages
-There are two types of messages: single messages and request / response messages. Single message is declared as an array with single object in JSON:
-```json
-"update": [{
-    "field_1": "uint8",
-    "field_2": "uint8",
-    "field_3": "uint8"
-}]
-```
-This will create class "UpdateMessage". Single messages are used when you need to send some data one way, for example, periodic updates. Request / response messages are declared as an array with two objects:
-```json
-"get_something": [{
-    "field_1": "uint8",
-}, {
-    "field_1": "uint8",
-    "field_2": "uint8",
-    "field_3": "uint8"
-}]
-```
-This will generate two classes: "GetSomethingRequest" and "GetSomethingResponse". Request class will have method $response(...) which returns an instance of response class.
+void main() async {
+    final ConnectMeClient client = await ConnectMe.connect('ws://127.0.0.1:31337');
+    
+    // Register PackMe messages from manifest.generated.dart to be able to process them.
+    client.register(manifestMessageFactory);
 
-## Optional fields
-By default, all fields are required. In order to declare an optional field, use "?" prefix:
-```json
-"?something_optional": "string"
-```
-Using optional fields is a good way to optimize resulting packet size since PackMe does not store any data for null valued fields.
-
-## Types
-You can declare fields of standard type (such as uint32, double, string), custom type (declared enums or objects) or nested object type.
-
-### Integer types
-- uint8 - 8 bits (from 0 to 255)
-- int8 - 8 bits (from -128 to 127)
-- uint16 - 16 bits (from 0 to 65,535)
-- int16 - 16 bits (from -32,768 to 32,767)
-- uint32 - 8 bits (from 0 to 4,294,967,295)
-- int32 - 8 bits (from -2,147,483,648 to 2,147,483,647)
-- uint64 - 8 bits (from 0 to 18,446,744,073,709,551,615)
-- int64 - 8 bits (from -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807)
-
-### Floating point types
-- float - 32 bits (from -3.4E+38 to 3.4E+38, ~7 significant digits)
-- double - 64 bits (from -1.7E+308 to 1.7E+308, ~16 significant digits)
-
-### Bool
-```json
-"parameter": "bool"
-```
-Note that using bool type is more efficient than uint8 since it requires only 1 bit and PackMe stores all bool fields together (up to 8 fields per byte).
-
-### String
-```json
-"parameter": "string"
-```
-All strings are interpreted and stored as UTF-8 strings.
-
-### DateTime
-```json
-"event_date": "datetime"
-```
-DateTime is packed as 64-bit signed integer (number of milliseconds that have elapsed since the Unix epoch).
-
-### Enum
-Enum is a custom type you can declare in the same JSON manifest file or in the separate one. Enum is declared as an array of strings:
-```json
-"message_status": [
-    "sent",
-    "delivered",
-    "read",
-    "unsent"
-]
-```
-It will generate enum "MessageStatus". In order to declare a field of enum type use "@" as a type prefix:
-```json
-"status": "@message_status"
-```
-
-### Object
-Like enums objects can be declared in any JSON file. It will be accessible for all manifest files. Object is declared as an object:
-```json
-"user_profile": {
-    "first_name": "string",
-    "last_name": "string",
-    "birth_date": "datetime"
+    // Listen for reverse String messages from the server.
+    client.listen<String>((String message) {
+        print('Here is our reversed string: $message');
+    });
+    
+    // Send a string message to the server.
+    client.send('Was it a car or a cat I saw?');
+    
+    // Query user data from the server. 
+    final GetUserResponse response = client.query<GetUserResponse>(GetUserRequest(id: 'hl3'));
+    print('A person name is ${response.firstName} ${response.lastName} and she is ${response.age} years old.');
 }
 ```
-It will generate class "UserProfile". In order to declare a field of object type use "@" as a type prefix:
-```json
-"profile": "@user_profile"
+
+## Server initialization and options
+There are two methods available: 
+* ConnectMe.server<T>(InternetAddress, {options}) - creates and returns ConnectMeServer instance; 
+* ConnectMe.serve<T>(InternetAddress, {options}) - creates ConnectMeServer instance and runs it. Returns Future<ConnectMeServer>.
+Generic <T> specifies a client class which will be used by server. By default it's ConnectMeClient. Any custom class must be derived from ConnectMeClient.
+Both methods have the same options available:
+* int port - port to listen (leave empty when using unix named sockets), default value: 0;
+* T Function(WebSocket, HttpHeaders)? clientFactory - factory function which returns T class instance;
+* int queryTimeout - timeout of query calls in seconds, default value: 30; 
+* Function(String)? onLog - log function, it is recommended to always set it;
+* Function(String, \[StackTrace])? onError - error handler function, it is recommended to always set it;
+* Function(T)? onConnect - client connect callback;
+* Function(T)? onDisconnect - client disconnect callback.
+```dart
+final ConnectMeServer server = ConnectMe.server(...);
+await server.serve();
+
+// Is the the same as:
+
+final ConnectMeServer server = await ConnectMe.serve(InternetAddress('127.0.0.1'),
 ```
 
-### Nested object
-It is possible to use nested objects as field types:
-```json
-"send_update": [{
-    "values": {
-        "min": "double",
-        "max": "double"
-    },
-    "rates": [{
-        "a": "float",
-        "b": "float",
-        "c": "float"
-    }]
-}]
-```
-In this case additional classes will be created: "SendUpdateMessageValues" and "SendUpdateMessageRate" which will be used as types for "values" and "rates" properties of "SendUpdateMessage" class.
+## Client initialization and options
+There are two methods available:
+* ConnectMe.client(String, {options}) - creates and returns ConnectMeClient instance;
+* ConnectMe.connect(String, {options}) - creates ConnectMeClient instance and establishes a connection. Returns Future<ConnectMeClient>.
+Both methods have the same options available:
+* Map<String, dynamic> headers - custom headers to send on connection;
+* bool autoReconnect - automatically reconnect when connection is lost, true by default;
+* int queryTimeout - timeout of query calls in seconds, default value: 30;
+* Function(String)? onLog - log function, it is recommended to always set it;
+* Function(String, \[StackTrace])? onError - error handler function, it is recommended to always set it;
+* Function()? onConnect - connect callback;
+* Function()? onDisconnect - disconnect callback.
+```dart
+final ConnectMeClient client = ConnectMe.client(...);
+await client.connect();
 
-## Arrays
-If you need to declare a field as an array of specific type, just put your type string into square brackets:
-```json
-"numbers": ["uint32"],
-"names": ["string"],
-"users": ["@user"]
+// Is the the same as:
+
+final ConnectMeClient client = await ConnectMe.connect(...);
+```
+
+## Send data
+You can send messages of different data types: String, Uint8List and [PackMe](https://pub.dev/packages/packme) messages.
+```dart
+client.send("Is this what you've been waiting for?");
+client.send(Uint8List.fromList(<int>[1, 2, 4]));
+client.send(GetUserResponse(
+    firstName: 'Alyx',
+    lastName: 'Vance',
+    age: 19,
+));
+```
+Keep in mind that GetUserResponse is sent as Uint8List as well. It means there is a tiny chance that your Uint8List data might be identified as [PackMe](https://pub.dev/packages/packme) message. In order to avoid this, it is not recommended to mix Uint8List and PackMe messages within a single client or server instance. Or just ensure that the first 4 bytes of your data never match those specified in registered PackMe message factories (Map<int, PackMeMessage> keys). 
+
+## Listen for message events
+Methods server.listen<T>(Function(T, C) handler) and client.listen<T>(Function(T) handler) allows you to listen for a message of specific type <T>. In order to cancel message listener call method cancel<T>(handler).
+```dart
+void _handleServerStringMessage(String message, ConnectMeClient client) {
+    print('Got a message: $message from client ${client.headers.host}');
+}
+
+void _handleServerGetUserRequest(GetUserRequest request, ConnectMeClient client) {
+    print('A client ${client.headers.host} asked for a user with ID: ${request.id}');
+}
+
+void _handleClientGetUserResponse(GetUserResponse response) {
+    print('Got a user from server: $response');
+}
+
+void main() async {
+    // ... whatever code goes here
+    
+    server.listen<String>(_handleServerStringMessage);
+    server.listen<GetUserRequest>(_handleServerGetUserRequest);
+    client.listen<GetUserResponse>(_handleClientGetUserResponse);
+    
+    // ... whatever code goes here
+    
+    server.cancel<String>(_handleServerStringMessage);
+    server.cancel<GetUserRequest>(_handleServerGetUserRequest);
+    client.cancel<GetUserResponse>(_handleClientGetUserResponse);
+}
+```
+
+## Listen for specific client messages
+Sometimes it is useful to be able to add message listeners for some specific clients only, for example, logged in users only. Instead of verifying it in global message listeners (which is less secure).
+```dart
+bool _isAuthorizedToDoSomething(String codePhrase) {
+    return codePhrase == "I am Iron Man.";
+}
+
+void main() async {
+    // ... whatever code goes here
+    
+    // Listen for some authorization request from connected clients.
+    server.listen<AuthorizeRequest>((AuthorizeRequest request, ConnectMeClient client) {
+        if (_isAuthorizedToDoSomething(request.codePhrase)) {
+            client.listen<GodModeRequest>(_handleGodModeRequest);
+            client.listen<AllWeaponsRequest>(_handleAllWeaponsRequest);
+            client.listen<KillEveryoneRequest>(_handleKillEveryoneRequest);
+            client.send(request.$response(
+                allowed: true,
+                reason: 'Welcome on board!',
+            ));
+        }
+        else {
+            client.send(request.$response(
+                allowed: false,
+                reason: 'You are not Iron Man.',
+            ));
+            // Close client connection.
+            client.close();
+        }
+    });
+}
+
+```
+
+## Broadcasting messages
+ConnectMeServer has a method broadcast() which allows you to send a message to all connected clients:
+```dart
+// Send a String message to all connected clients.
+server.broadcast('Cheese for Everyone!');
+
+// Send a String message to specific clients only.
+server.broadcast('Scratch that! Cheese for no one.', (ConnectMeClient client) {
+    return client.headers.host == '127.0.0.1';
+});
+```
+
+## Managing server clients
+You can access all connected clients via property List<T> server.clients - where <T> is your class for clients (ConnectMeClient by default). Every client has two useful properties:
+* WebSocket? socket - client connection socket;
+* late final HttpHeaders headers - HTTP headers sent by client on connection;
+```dart
+// Close all local connections. Keep in mind that it will automatically remove those clients from server.clients.
+List<ConnectMeClient> _clientsToDisconnect = <ConnectMeClient>[];
+_clientsToDisconnect.addAll(server.clients.where((ConnectMeClient client) => client.headers.host == '127.0.0.1'));
+for (final ConnectMeClient client in _clientsToDisconnect) client.close();
 ```
 
 ## Supported platforms
-Now it's available for Dart and JavaScript. Will there be more platforms? Well it depends... If developers will find this package useful then it will be implemented for C++ I guess.
+Now it's available for Dart only. Soon will be implemented for JavaScript. Will there be more platforms? Well it depends... If developers will find this package useful then it will be implemented for C++ I guess.
