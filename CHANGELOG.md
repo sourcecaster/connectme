@@ -1,5 +1,7 @@
-## 1.0.0
+## v1.0.1
+* Some client properties scope changed to private.
 
+## v1.0.0
 * Example extended.
 * Readme added.
 * Tests implemented.
