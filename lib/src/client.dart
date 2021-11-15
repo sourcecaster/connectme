@@ -7,38 +7,63 @@ class _Query<T> {
 }
 
 class ConnectMeClient {
-	ConnectMeClient(this.socket, this.headers) : url = '', _autoReconnect = false, requestHeaders = const <String, dynamic>{} {
-		_listenSocket(asServer: true);
+	ConnectMeClient(this.socket) :
+			_packMe = socket._server!._packMe,
+			_server = socket._server,
+			address = null,
+			headers = const <String, dynamic>{},
+			port = 0,
+			autoReconnect = false,
+			queryTimeout = socket._server!.queryTimeout,
+			onLog = socket._server!.onLog,
+			onError = socket._server!.onError {
+		_socketInitialized = true;
+		_listenSocket();
 	}
 
-	ConnectMeClient._(this.url, this.requestHeaders, this._autoReconnect, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
+	ConnectMeClient._(this.address, this.headers, this.port, this.autoReconnect, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) :
+			_packMe = PackMe(onError: onError),
+			_server = null;
 
-	late final PackMe _packMe;
-	final String url;
-	final bool _autoReconnect;
+	final ConnectMeServer<ConnectMeClient>? _server;
+	final PackMe _packMe;
+
+	late ConnectMeSocket socket;
+	final dynamic address;
+	final Map<String, dynamic> headers;
+	final int port;
+	bool autoReconnect;
+	int queryTimeout;
+
+	bool _socketInitialized = false;
 	bool _applyReconnect = true;
-	late final int queryTimeout;
-	late final ConnectMeServer<ConnectMeClient> _server;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
-	WebSocket? socket;
-	late final HttpHeaders headers;
-	final Map<String, dynamic> requestHeaders;
 	final Map<int, _Query<PackMeMessage>> _queries = <int, _Query<PackMeMessage>>{};
 	Timer? _queriesTimer;
 
-	late final Function(String)? onLog;
-	late final Function(String, [StackTrace])? onError;
-	late final Function? onConnect;
-	late final Function? onDisconnect;
+	final Function(String)? onLog;
+	final Function(String, [StackTrace])? onError;
+	Function? onConnect;
+	Function? onDisconnect;
 
 	Future<void> connect() async {
-		_applyReconnect = true;
-		_queriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) => _checkQueriesTimeout());
-		await onLog?.call('Connecting to $url...');
-		socket = await WebSocket.connect(url, headers: requestHeaders);
-		onConnect?.call();
-		await onLog?.call('Connection established');
-		_listenSocket(asServer: false);
+		if (_server == null) {
+			_applyReconnect = true;
+			_queriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) => _checkQueriesTimeout());
+			await onLog?.call('Connecting to $address...');
+
+			InternetAddress? internetAddress;
+			if (address is String) internetAddress = InternetAddress.tryParse(address as String);
+			else if (address is InternetAddress) internetAddress = address as InternetAddress;
+			else throw Exception('Address must be either String or InternetAddress instance');
+			if (internetAddress == null) socket = ConnectMeSocket.ws(await WebSocket.connect(address as String, headers: headers));
+			else socket = ConnectMeSocket.tcp(await Socket.connect(internetAddress, port));
+			_socketInitialized = true;
+
+			onConnect?.call();
+			await onLog?.call('Connection established');
+			_listenSocket();
+		}
 	}
 
 	void _checkQueriesTimeout({bool cancelDueToClose = false}) {
@@ -63,8 +88,8 @@ class ConnectMeClient {
 		}
 	}
 
-	void _listenSocket({required bool asServer}) {
-		socket?.listen((dynamic data) {
+	void _listenSocket() {
+		socket.listen((dynamic data) {
 			if (data is Uint8List) {
 				final PackMeMessage? message = _packMe.unpack(data);
 				if (message != null) {
@@ -82,22 +107,22 @@ class ConnectMeClient {
 			if (_handlers[type] != null) {
 				for (final Function handler in _handlers[type]!) _processHandler(handler, data);
 			}
-			if (asServer && _server._handlers[type] != null) {
-				for (final Function handler in _server._handlers[type]!) _processHandler(handler, data, this);
+			if (_server != null && _server!._handlers[type] != null) {
+				for (final Function handler in _server!._handlers[type]!) _processHandler(handler, data, this);
 			}
 		}, onDone: () {
 			_checkQueriesTimeout(cancelDueToClose: true);
-			if (asServer) {
-				_server.clients.remove(this);
+			if (_server != null) {
+				_server!.clients.remove(this);
 				onDisconnect?.call(this);
 			}
 			else {
 				onDisconnect?.call();
-				if (_autoReconnect && _applyReconnect) {
-					onError?.call('Connection to $url was closed, reconnect in 3 second...');
+				if (autoReconnect && _applyReconnect) {
+					onError?.call('Connection to $address was closed, reconnect in 3 second...');
 					Timer(const Duration(seconds: 3), connect);
 				}
-				else onLog?.call('Disconnected from $url');
+				else onLog?.call('Disconnected from $address');
 			}
 		}, onError: (dynamic err, StackTrace stack) {
 			onError?.call('ConnectMe socket error has occurred: $err', stack);
@@ -114,15 +139,15 @@ class ConnectMeClient {
 			onError?.call('Unsupported data type for Client.send(), only PackMeMessage, Uint8List and String are supported');
 			return;
 		}
-		if (data != null && socket?.readyState == WebSocket.open) socket!.add(data);
+		if (data != null && socket.state == WebSocket.open) socket.add(data);
 	}
 
 	Future<T> query<T extends PackMeMessage>(PackMeMessage message) {
 		final Completer<T> completer = Completer<T>();
 		final Uint8List? data = _packMe.pack(message);
-		if (data != null && socket?.readyState == WebSocket.open) {
+		if (data != null && socket.state == WebSocket.open) {
 			_queries[message.$transactionId] = _Query<T>(completer);
-			socket!.add(data);
+			socket.add(data);
 		}
 		else {
 			onError?.call("ConnectMe client.query() failed to pack message, future won't be resolved");
@@ -146,6 +171,6 @@ class ConnectMeClient {
 		}
 		_handlers.clear();
 		_applyReconnect = false;
-		await socket?.close();
+		if (_socketInitialized) await socket.close();
 	}
 }

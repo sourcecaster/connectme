@@ -19,7 +19,7 @@ void logError(String error, [StackTrace? stack]) {
 /// in ConnectMeServer (using classFactory argument).
 
 class CustomServerClient extends ConnectMeClient {
-	CustomServerClient(WebSocket socket, HttpHeaders headers) : super(socket, headers);
+	CustomServerClient(ConnectMeSocket socket) : super(socket);
 	late final String name;
 	late final int age;
 }
@@ -36,14 +36,14 @@ Future<void> createTestServer() async {
 		onLog: logMessage,
 		onError: logError,
 		onConnect: (CustomServerClient client) {
-			logMessage('\n[SERVER]: A client from ${client.headers.host} has connected.');
+			logMessage('\n[SERVER]: A client from ${client.socket.httpRequest!.headers.host} has connected.');
 		},
 		onDisconnect: (CustomServerClient client) {
 			logMessage('[SERVER]: A client ${client.name} has disconnected.');
 			server.close();
 		},
 		/// Client factory returns our inherited class instance.
-		clientFactory: (_, __) => CustomServerClient(_, __),
+		clientFactory: (_) => CustomServerClient(_),
 	);
 
 	/// Register PackMe messages from generated/manifest.generated.dart in order

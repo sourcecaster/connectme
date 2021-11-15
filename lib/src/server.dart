@@ -1,15 +1,17 @@
 part of connectme;
 
 class ConnectMeServer<C extends ConnectMeClient> {
-	ConnectMeServer._(this.address, this.port, this._clientFactory, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
+	ConnectMeServer._(this.address, this.port, this.type, this._clientFactory, this.queryTimeout, this.onLog, this.onError, this.onConnect, this.onDisconnect) : _packMe = PackMe(onError: onError);
 
 	final PackMe _packMe;
 	final InternetAddress address;
 	final int port;
+	final ConnectMeType type;
 	final int queryTimeout;
-	late final HttpServer? httpServer;
+	HttpServer? _httpServer;
+	ServerSocket? _tcpServer;
 	final List<C> clients = <C>[];
-	final C Function(WebSocket, HttpHeaders)? _clientFactory;
+	final C Function(ConnectMeSocket)? _clientFactory;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
 	Timer? clientsQueriesTimer;
 
@@ -18,36 +20,60 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	final Function(C)? onConnect;
 	final Function(C)? onDisconnect;
 
+	Future<void> _bind(InternetAddress address, int port) async {
+		switch (type) {
+			case ConnectMeType.ws:
+				_httpServer = await HttpServer.bind(address, port);
+				break;
+			case ConnectMeType.tcp:
+				_tcpServer = await ServerSocket.bind(address, port);
+				break;
+		}
+	}
+
 	Future<void> serve() async {
-		clientsQueriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
-			for (final C client in clients) client._checkQueriesTimeout();
-		});
+		final String protocol = type == ConnectMeType.ws ? 'WebSocket' : 'TCP';
+
 		if (address.type == InternetAddressType.unix) {
-			onLog?.call('Starting ConnectMe server using unix named socket...');
+			onLog?.call('Starting $protocol server using unix named socket...');
 			final File socketFile = File(address.address);
 			if (socketFile.existsSync()) socketFile.deleteSync(recursive: true);
-			httpServer = await HttpServer.bind(InternetAddress(address.address, type: InternetAddressType.unix), 0);
+			await _bind(address, 0);
+			if (socketFile.existsSync()) Process.run('chmod', <String>['0677', address.address]);
 		}
-		else if (address.address != null) {
-			onLog?.call('Starting ConnectMe server using IP address...');
-			httpServer = await HttpServer.bind(InternetAddress(address.address, type: InternetAddressType.IPv4), port);
+		else {
+			onLog?.call('Starting $protocol server using IP address...');
+			await _bind(address, port);
 		}
-		if (httpServer != null) {
-			httpServer!.listen((HttpRequest request) async {
-				final WebSocket socket = await WebSocketTransformer.upgrade(request);
-				final C client = _clientFactory != null ? _clientFactory!(socket, request.headers) : ConnectMeClient(socket, request.headers) as C;
-				client._server = this;
-				client._packMe = _packMe;
-				client.queryTimeout = queryTimeout;
-				client.onLog = onLog;
-				client.onError = onError;
-				client.onConnect = onConnect;
-				client.onDisconnect = onDisconnect;
+
+		if (_httpServer != null) {
+			_httpServer!.listen((HttpRequest request) async {
+				final ConnectMeSocket socket = ConnectMeSocket.ws(await WebSocketTransformer.upgrade(request), request);
+				socket._server = this;
+				final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
+					..onConnect = onConnect
+					..onDisconnect = onDisconnect;
 				clients.add(client);
 				onConnect?.call(client);
 			});
-			onLog?.call('ConnectMe server is running on: ${httpServer!.address.address}${address.type != InternetAddressType.unix ? ' port ${httpServer!.port}' : ''}');
 		}
+		else if (_tcpServer != null) {
+			_tcpServer!.listen((Socket tcpSocket) {
+				final ConnectMeSocket socket = ConnectMeSocket.tcp(tcpSocket);
+				socket._server = this;
+				final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
+					..onConnect = onConnect
+					..onDisconnect = onDisconnect;
+				clients.add(client);
+				onConnect?.call(client);
+			});
+		}
+		else return;
+
+		onLog?.call('$protocol server is running on: ${address.address}${address.type != InternetAddressType.unix ? ' port $port' : ''}');
+		clientsQueriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+			for (final C client in clients) client._checkQueriesTimeout();
+		});
 	}
 
 	void register(Map<int, PackMeMessage Function()> messageFactory) {
@@ -62,7 +88,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 		}
 		for (final C client in clients) {
 			if (where != null && !where(client)) continue;
-			if (data != null && client.socket?.readyState == WebSocket.open) client.socket!.add(data);
+			if (data != null && client.socket.state == WebSocket.open) client.socket.add(data);
 		}
 	}
 
@@ -81,8 +107,9 @@ class ConnectMeServer<C extends ConnectMeClient> {
 			clientsQueriesTimer = null;
 		}
 		for (int i = clients.length - 1; i >= 0; i--) {
-			await clients[i].socket?.close();
+			await clients[i].socket.close();
 		}
-		await httpServer?.close();
+		if (_httpServer != null) await _httpServer?.close();
+		else if (_tcpServer != null) await _tcpServer?.close();
 	}
 }

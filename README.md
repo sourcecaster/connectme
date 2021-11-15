@@ -1,5 +1,5 @@
 ## What is ConnectMe
-ConnectMe is a lightweight library for working with WebSocket connections both on client and server sides. It allows you to:
+ConnectMe is a lightweight library for working with WebSocket or TCP connections both on client and server sides. It allows you to:
 * create connections to WebSocket servers with different options (like autoReconnect, queryTimeout);
 * create WebSocket servers using any InternetAddress object;
 * manage connections on server side using default or your own Client class;
