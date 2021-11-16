@@ -16,21 +16,6 @@ class ConnectMeSocket {
 		return type == ConnectMeType.ws ? webSocket!.readyState : WebSocket.open;
 	}
 
-	static Future<ConnectMeSocket> connect(dynamic address, {Map<String, dynamic>? headers, int port = 0}) async {
-		InternetAddress? internetAddress;
-		if (address is String) internetAddress = InternetAddress.tryParse(address);
-		else if (address is InternetAddress) internetAddress = address;
-		else throw Exception('Address must be either String or InternetAddress instance');
-		if (internetAddress == null) {
-			final WebSocket socket = await WebSocket.connect(address as String, headers: headers);
-			return ConnectMeSocket.ws(socket);
-		}
-		else {
-			final Socket socket = await Socket.connect(internetAddress, port);
-			return ConnectMeSocket.tcp(socket);
-		}
-	}
-
 	void listen(Function(dynamic) onData, {Function? onError, Function()? onDone}) {
 		switch (type) {
 			case ConnectMeType.ws:
@@ -57,10 +42,11 @@ class ConnectMeSocket {
 	Future<void> close() async {
 		switch (type) {
 			case ConnectMeType.ws:
-				webSocket!.close();
+				await webSocket!.close();
 				break;
 			case ConnectMeType.tcp:
-				tcpSocket!.close();
+				await tcpSocket!.close();
+				tcpSocket!.destroy();
 				break;
 		}
 	}

@@ -2,6 +2,8 @@
 * ConnectMeClient constructor now takes single ConnectMeSocket argument.
 * TCP sockets server/connection support added (breaking changes).
 * Bugfix: unix named sockets failed to receive connections due to bad socket file permissions.
+* Bugfix: client connection failed reconnect attempt (with autoReconnect: true) caused an unhandled exception.
+* Bugfix: socket connections were not properly closed in some cases which could potentially lead to memory leaks.
 
 ## v1.1.1
 * Safari WebSocket data parsing bug fixed (it adds some extra bytes to buffer and actual Uint8List data size is smaller that its underlying buffer).

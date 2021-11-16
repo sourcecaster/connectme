@@ -34,41 +34,53 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	Future<void> serve() async {
 		final String protocol = type == ConnectMeType.ws ? 'WebSocket' : 'TCP';
 
-		if (address.type == InternetAddressType.unix) {
-			onLog?.call('Starting $protocol server using unix named socket...');
-			final File socketFile = File(address.address);
-			if (socketFile.existsSync()) socketFile.deleteSync(recursive: true);
-			await _bind(address, 0);
-			if (socketFile.existsSync()) Process.run('chmod', <String>['0677', address.address]);
+		try {
+			if (address.type == InternetAddressType.unix) {
+				onLog?.call('Starting $protocol server using unix named socket...');
+				final File socketFile = File(address.address);
+				if (socketFile.existsSync()) socketFile.deleteSync(recursive: true);
+				await _bind(address, 0);
+				if (socketFile.existsSync()) Process.run('chmod', <String>['0677', address.address]);
+			}
+			else {
+				onLog?.call('Starting $protocol server using IP address...');
+				await _bind(address, port);
+			}
 		}
-		else {
-			onLog?.call('Starting $protocol server using IP address...');
-			await _bind(address, port);
+		catch (err, stack) {
+			onError?.call('Unable to bind $protocol server to $address: $err', stack);
+			return;
 		}
 
-		if (_httpServer != null) {
-			_httpServer!.listen((HttpRequest request) async {
-				final ConnectMeSocket socket = ConnectMeSocket.ws(await WebSocketTransformer.upgrade(request), request);
-				socket._server = this;
-				final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
-					..onConnect = onConnect
-					..onDisconnect = onDisconnect;
-				clients.add(client);
-				onConnect?.call(client);
-			});
+		try {
+			if (_httpServer != null) {
+				_httpServer!.listen((HttpRequest request) async {
+					final ConnectMeSocket socket = ConnectMeSocket.ws(await WebSocketTransformer.upgrade(request), request);
+					socket._server = this;
+					final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
+						..onConnect = onConnect
+						..onDisconnect = onDisconnect;
+					clients.add(client);
+					onConnect?.call(client);
+				});
+			}
+			else if (_tcpServer != null) {
+				_tcpServer!.listen((Socket tcpSocket) {
+					final ConnectMeSocket socket = ConnectMeSocket.tcp(tcpSocket);
+					socket._server = this;
+					final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
+						..onConnect = onConnect
+						..onDisconnect = onDisconnect;
+					clients.add(client);
+					onConnect?.call(client);
+				});
+			}
+			else return;
 		}
-		else if (_tcpServer != null) {
-			_tcpServer!.listen((Socket tcpSocket) {
-				final ConnectMeSocket socket = ConnectMeSocket.tcp(tcpSocket);
-				socket._server = this;
-				final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
-					..onConnect = onConnect
-					..onDisconnect = onDisconnect;
-				clients.add(client);
-				onConnect?.call(client);
-			});
+		catch (err, stack) {
+			onError?.call('Unable to listen to $protocol server socket: $err', stack);
+			return;
 		}
-		else return;
 
 		onLog?.call('$protocol server is running on: ${address.address}${address.type != InternetAddressType.unix ? ' port $port' : ''}');
 		clientsQueriesTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
@@ -106,9 +118,12 @@ class ConnectMeServer<C extends ConnectMeClient> {
 			clientsQueriesTimer!.cancel();
 			clientsQueriesTimer = null;
 		}
+		final List<Future<void>> promises = <Future<void>>[];
 		for (int i = clients.length - 1; i >= 0; i--) {
-			await clients[i].socket.close();
+			promises.add(clients[i].close());
 		}
+		await Future.wait(promises);
+		clients.clear();
 		if (_httpServer != null) await _httpServer?.close();
 		else if (_tcpServer != null) await _tcpServer?.close();
 	}

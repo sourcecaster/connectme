@@ -34,6 +34,7 @@ class ConnectMeClient {
 	final int port;
 	bool autoReconnect;
 	int queryTimeout;
+	Timer? reconnectTimer;
 
 	bool _socketInitialized = false;
 	bool _applyReconnect = true;
@@ -56,8 +57,18 @@ class ConnectMeClient {
 			if (address is String) internetAddress = InternetAddress.tryParse(address as String);
 			else if (address is InternetAddress) internetAddress = address as InternetAddress;
 			else throw Exception('Address must be either String or InternetAddress instance');
-			if (internetAddress == null) socket = ConnectMeSocket.ws(await WebSocket.connect(address as String, headers: headers));
-			else socket = ConnectMeSocket.tcp(await Socket.connect(internetAddress, port));
+			try {
+				if (internetAddress == null) socket = ConnectMeSocket.ws(await WebSocket.connect(address as String, headers: headers));
+				else socket = ConnectMeSocket.tcp(await Socket.connect(internetAddress, port));
+			}
+			catch (err, stack) {
+				onError?.call('Unable to connect: $err', stack);
+				if (autoReconnect && _applyReconnect) {
+					onError?.call('Unable to connect to $address, reconnect in 3 second...');
+					reconnectTimer = Timer(const Duration(seconds: 3), connect);
+				}
+				return;
+			}
 			_socketInitialized = true;
 
 			onConnect?.call();
@@ -115,17 +126,22 @@ class ConnectMeClient {
 			if (_server != null) {
 				_server!.clients.remove(this);
 				onDisconnect?.call(this);
+				close();
 			}
 			else {
 				onDisconnect?.call();
 				if (autoReconnect && _applyReconnect) {
 					onError?.call('Connection to $address was closed, reconnect in 3 second...');
-					Timer(const Duration(seconds: 3), connect);
+					reconnectTimer = Timer(const Duration(seconds: 3), connect);
 				}
-				else onLog?.call('Disconnected from $address');
+				else {
+					onLog?.call('Disconnected from $address');
+					close();
+				}
 			}
 		}, onError: (dynamic err, StackTrace stack) {
 			onError?.call('ConnectMe socket error has occurred: $err', stack);
+			close();
 		});
 	}
 
@@ -165,6 +181,7 @@ class ConnectMeClient {
 	}
 
 	Future<void> close() async {
+		if (reconnectTimer != null && reconnectTimer!.isActive) reconnectTimer!.cancel();
 		if (_queriesTimer != null) {
 			_queriesTimer!.cancel();
 			_queriesTimer = null;
