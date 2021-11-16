@@ -48,9 +48,11 @@ void main() async {
         onDisconnect: (ConnectMeClient client) {
             print('${client.headers.host} disconnected.');
         },
+        type: ConnectMeType.ws, // by default, means using WebSocket server, can be also pure TCP
     );
     
     // Listen for a String message and send reverse string back to client.
+    // (Note: it will not work with TCP server since all Strings are sent as Uint8List)
     server.listen<String>((String message, ConnectMeClient client) {
         client.send(message.split('').reversed.join(''));
     });
@@ -96,12 +98,12 @@ void main() async {
 
 ## Server initialization and options
 There are two methods available: 
-* ConnectMe.server<T>(InternetAddress, {options}) - creates and returns ConnectMeServer instance; 
-* ConnectMe.serve<T>(InternetAddress, {options}) - creates ConnectMeServer instance and runs it. Returns Future<ConnectMeServer>.
+* ConnectMe.server<T>(InternetAddress address, {options}) - creates and returns ConnectMeServer instance; 
+* ConnectMe.serve<T>(InternetAddress address, {options}) - creates ConnectMeServer instance and runs it. Returns Future<ConnectMeServer>.
 Generic <T> specifies a client class which will be used by server. By default it's ConnectMeClient. Any custom class must be derived from ConnectMeClient.
 Both methods have the same options available:
 * int port - port to listen (leave empty when using unix named sockets), default value: 0;
-* T Function(WebSocket, HttpHeaders)? clientFactory - factory function which returns T class instance;
+* T Function(ConnectMeSocket)? clientFactory - factory function which returns T class instance;
 * int queryTimeout - timeout of query calls in seconds, default value: 30; 
 * Function(String)? onLog - log function, it is recommended to always set it;
 * Function(String, \[StackTrace])? onError - error handler function, it is recommended to always set it;
@@ -111,15 +113,16 @@ Both methods have the same options available:
 final ConnectMeServer server = ConnectMe.server(...);
 await server.serve();
 
-// Is the the same as:
+// Is the same as:
 
 final ConnectMeServer server = await ConnectMe.serve(InternetAddress('127.0.0.1'),
 ```
 
 ## Client initialization and options
 There are two methods available:
-* ConnectMe.client(String, {options}) - creates and returns ConnectMeClient instance;
-* ConnectMe.connect(String, {options}) - creates ConnectMeClient instance and establishes a connection. Returns Future<ConnectMeClient>.
+* ConnectMe.client(dynamic address, {options}) - creates and returns ConnectMeClient instance;
+* ConnectMe.connect(dynamic address, {options}) - creates ConnectMeClient instance and establishes a connection. Returns Future<ConnectMeClient>.
+If address is a valid url starting with 'ws://' or 'wss://' then WebSocket connection is established. If address is an instance of InternetAddress then TCP Socket connection will be used.
 Both methods have the same options available:
 * Map<String, dynamic> headers - custom headers to send on connection;
 * bool autoReconnect - automatically reconnect when connection is lost, true by default;
