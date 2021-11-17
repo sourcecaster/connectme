@@ -99,28 +99,36 @@ class ConnectMeClient {
 		}
 	}
 
+	void _processData(dynamic data) {
+		if (data is Uint8List) {
+			final PackMeMessage? message = _packMe.unpack(data);
+			if (message != null) {
+				final int transactionId = message.$transactionId;
+				if (_queries[transactionId] != null) {
+					final Completer<PackMeMessage> completer = _queries[transactionId]!.completer;
+					_queries.remove(transactionId);
+					completer.complete(message);
+					return;
+				}
+				data = message;
+			}
+		}
+		final Type type = data is Uint8List ? Uint8List : data.runtimeType;
+		if (_handlers[type] != null) {
+			for (final Function handler in _handlers[type]!) _processHandler(handler, data);
+		}
+		if (_server != null && _server!._handlers[type] != null) {
+			for (final Function handler in _server!._handlers[type]!) _processHandler(handler, data, this);
+		}
+	}
+
 	void _listenSocket() {
 		socket.listen((dynamic data) {
-			if (data is Uint8List) {
-				final PackMeMessage? message = _packMe.unpack(data);
-				if (message != null) {
-					final int transactionId = message.$transactionId;
-					if (_queries[transactionId] != null) {
-						final Completer<PackMeMessage> completer = _queries[transactionId]!.completer;
-						_queries.remove(transactionId);
-						completer.complete(message);
-						return;
-					}
-					data = message;
-				}
+			if (socket.type == ConnectMeType.tcp) {
+				final List<Uint8List> packets = socket._extractPackets(data as Uint8List);
+				packets.forEach(_processData);
 			}
-			final Type type = data is Uint8List ? Uint8List : data.runtimeType;
-			if (_handlers[type] != null) {
-				for (final Function handler in _handlers[type]!) _processHandler(handler, data);
-			}
-			if (_server != null && _server!._handlers[type] != null) {
-				for (final Function handler in _server!._handlers[type]!) _processHandler(handler, data, this);
-			}
+			else _processData(data);
 		}, onDone: () {
 			_checkQueriesTimeout(cancelDueToClose: true);
 			if (_server != null) {

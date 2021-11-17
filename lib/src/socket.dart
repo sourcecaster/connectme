@@ -11,6 +11,8 @@ class ConnectMeSocket {
 	final HttpRequest? httpRequest;
 	final Socket? tcpSocket;
 	ConnectMeServer<ConnectMeClient>? _server;
+	int _packetLength = 0;
+	final BytesBuilder _packetBuffer = BytesBuilder();
 
 	int get state {
 		return type == ConnectMeType.ws ? webSocket!.readyState : WebSocket.open;
@@ -34,6 +36,7 @@ class ConnectMeSocket {
 				break;
 			case ConnectMeType.tcp:
 				final Uint8List bytes = data is String ? _utf8.encoder.convert(data) : data as Uint8List;
+				tcpSocket!.add(Uint8List(4)..buffer.asByteData().setUint32(0, 4 + bytes.length, Endian.big));
 				tcpSocket!.add(bytes);
 				break;
 		}
@@ -49,5 +52,24 @@ class ConnectMeSocket {
 				tcpSocket!.destroy();
 				break;
 		}
+	}
+
+	List<Uint8List> _extractPackets(Uint8List data) {
+		_packetBuffer.add(data);
+		if (_packetBuffer.length >= _packetLength) {
+			final List<Uint8List> result = <Uint8List>[];
+			final Uint8List buffer = _packetBuffer.takeBytes();
+			int offset = 0;
+			do {
+				_packetLength = buffer.buffer.asByteData().getUint32(offset, Endian.big);
+				if (buffer.length < offset + _packetLength) break;
+				final Uint8List data = buffer.sublist(offset + 4, offset + _packetLength);
+				offset += _packetLength;
+				result.add(data);
+			} while (buffer.length >= offset + 4);
+			_packetBuffer.add(buffer.sublist(offset));
+			return result;
+		}
+		return <Uint8List>[];
 	}
 }

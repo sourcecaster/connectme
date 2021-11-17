@@ -1,6 +1,6 @@
 name: connectme
 description: WebSocket connection management library to handle client-server communication in event-based manner or await-query style (using PackMe messages).
-version: 2.0.0
+version: 2.0.1
 homepage: https://github.com/sourcecaster/connectme
 repository: https://github.com/sourcecaster/connectme
 issue_tracker: https://github.com/sourcecaster/connectme/issues

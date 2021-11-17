@@ -1,3 +1,6 @@
+## v2.0.1
+* TCP data message boundaries implemented.
+
 ## v2.0.0
 * ConnectMeClient constructor now takes single ConnectMeSocket argument.
 * TCP sockets server/connection support added (breaking changes).
