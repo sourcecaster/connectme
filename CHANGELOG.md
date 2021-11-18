@@ -1,3 +1,7 @@
+## v2.0.2
+* Maximum data length increased to 2^63 for messages sent over TCP socket.
+* Bugfix: data messages sent over TCP socket could stall in some cases.
+
 ## v2.0.1
 * TCP data message boundaries implemented.
 

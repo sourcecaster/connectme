@@ -36,7 +36,7 @@ class ConnectMeSocket {
 				break;
 			case ConnectMeType.tcp:
 				final Uint8List bytes = data is String ? _utf8.encoder.convert(data) : data as Uint8List;
-				tcpSocket!.add(Uint8List(4)..buffer.asByteData().setUint32(0, 4 + bytes.length, Endian.big));
+				tcpSocket!.add(Uint8List(8)..buffer.asByteData().setUint64(0, 8 + bytes.length, Endian.big));
 				tcpSocket!.add(bytes);
 				break;
 		}
@@ -61,12 +61,13 @@ class ConnectMeSocket {
 			final Uint8List buffer = _packetBuffer.takeBytes();
 			int offset = 0;
 			do {
-				_packetLength = buffer.buffer.asByteData().getUint32(offset, Endian.big);
+				_packetLength = buffer.buffer.asByteData().getUint64(offset, Endian.big);
 				if (buffer.length < offset + _packetLength) break;
-				final Uint8List data = buffer.sublist(offset + 4, offset + _packetLength);
+				final Uint8List data = buffer.sublist(offset + 8, offset + _packetLength);
 				offset += _packetLength;
 				result.add(data);
-			} while (buffer.length >= offset + 4);
+				_packetLength = 0;
+			} while (buffer.length >= offset + 8);
 			_packetBuffer.add(buffer.sublist(offset));
 			return result;
 		}
