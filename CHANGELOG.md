@@ -1,6 +1,5 @@
 ## v2.1.0
-Added support for binary type (uses Uint8List). Format: binary12, binary64 etc. - any buffer length in bytes.
-Color schemes used to print messages are updated: list items are now displayed using color of corresponding data type.
+* Added support for binary type (uses Uint8List). Format: binary12, binary64 etc. - any buffer length in bytes.
 
 ## v2.0.2
 * Maximum data length increased to 2^63 for messages sent over TCP socket.
