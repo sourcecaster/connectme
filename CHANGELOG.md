@@ -1,3 +1,7 @@
+## v2.1.1
+* PackMe upgraded to v2.0.0: object inheritance implemented, nested arrays support.
+* IMPORTANT: PackMe objects and enumerations from other JSON files are now referenced using filename: "some_user": "@filename:user". No changes required for references within the same file.
+
 ## v2.1.0
 * Added support for binary type (uses Uint8List). Format: binary12, binary64 etc. - any buffer length in bytes.
 

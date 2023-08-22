@@ -98,9 +98,9 @@ void main() async {
 
 ## Server initialization and options
 There are two methods available: 
-* ConnectMe.server<T>(InternetAddress address, {options}) - creates and returns ConnectMeServer instance; 
-* ConnectMe.serve<T>(InternetAddress address, {options}) - creates ConnectMeServer instance and runs it. Returns Future<ConnectMeServer>.
-Generic <T> specifies a client class which will be used by server. By default it's ConnectMeClient. Any custom class must be derived from ConnectMeClient.
+* ConnectMe.server\<T>(InternetAddress address, {options}) - creates and returns ConnectMeServer instance; 
+* ConnectMe.serve\<T>(InternetAddress address, {options}) - creates ConnectMeServer instance and runs it. Returns Future\<ConnectMeServer>.
+Generic \<T> specifies a client class which will be used by server. By default it's ConnectMeClient. Any custom class must be derived from ConnectMeClient.
 Both methods have the same options available:
 * int port - port to listen (leave empty when using unix named sockets), default value: 0;
 * T Function(ConnectMeSocket)? clientFactory - factory function which returns T class instance;
@@ -121,10 +121,10 @@ final ConnectMeServer server = await ConnectMe.serve(InternetAddress('127.0.0.1'
 ## Client initialization and options
 There are two methods available:
 * ConnectMe.client(dynamic address, {options}) - creates and returns ConnectMeClient instance;
-* ConnectMe.connect(dynamic address, {options}) - creates ConnectMeClient instance and establishes a connection. Returns Future<ConnectMeClient>.
+* ConnectMe.connect(dynamic address, {options}) - creates ConnectMeClient instance and establishes a connection. Returns Future\<ConnectMeClient>.
 If address is a valid url starting with 'ws://' or 'wss://' then WebSocket connection is established. If address is an instance of InternetAddress then TCP Socket connection will be used.
 Both methods have the same options available:
-* Map<String, dynamic> headers - custom headers to send on connection;
+* Map\<String, dynamic> headers - custom headers to send on connection;
 * bool autoReconnect - automatically reconnect when connection is lost, true by default;
 * int queryTimeout - timeout of query calls in seconds, default value: 30;
 * Function(String)? onLog - log function, it is recommended to always set it;
@@ -154,7 +154,7 @@ client.send(GetUserResponse(
 Keep in mind that GetUserResponse is sent as Uint8List as well. It means there is a tiny chance that your Uint8List data might be identified as [PackMe](https://pub.dev/packages/packme) message. In order to avoid this, it is not recommended to mix Uint8List and PackMe messages within a single client or server instance. Or just ensure that the first 4 bytes of your data never match those specified in registered PackMe message factories (Map<int, PackMeMessage> keys). 
 
 ## Listen for message events
-Methods server.listen<T>(Function(T, C) handler) and client.listen<T>(Function(T) handler) allows you to listen for a message of specific type <T>. In order to cancel message listener call method cancel<T>(handler).
+Methods server.listen\<T>(Function(T, C) handler) and client.listen\<T>(Function(T) handler) allows you to listen for a message of specific type \<T>. In order to cancel message listener call method cancel\<T>(handler).
 ```dart
 void _handleServerStringMessage(String message, ConnectMeClient client) {
     print('Got a message: $message from client ${client.headers.host}');
@@ -230,7 +230,7 @@ server.broadcast('Scratch that! Cheese for no one.', (ConnectMeClient client) {
 ```
 
 ## Managing server clients
-You can access all connected clients via property List<T> server.clients - where <T> is your class for clients (ConnectMeClient by default). Every client has two useful properties:
+You can access all connected clients via property List\<T> server.clients - where \<T> is your class for clients (ConnectMeClient by default). Every client has two useful properties:
 * WebSocket? socket - client connection socket;
 * late final HttpHeaders headers - HTTP headers sent by client on connection;
 ```dart

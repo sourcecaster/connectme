@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:packme/packme.dart';
 
 enum MathOperation {
@@ -17,13 +16,13 @@ class IntroductionMessage extends PackMeMessage {
 
 	late String name;
 	late int age;
-	
+
 	@override
 	int $estimate() {
 		$reset();
-		int bytes = 9;
-		bytes += $stringBytes(name);
-		return bytes;
+		int _bytes = 9;
+		_bytes += $stringBytes(name);
+		return _bytes;
 	}
 
 	@override
@@ -46,39 +45,6 @@ class IntroductionMessage extends PackMeMessage {
 	}
 }
 
-class MathQuestionResponse extends PackMeMessage {
-	MathQuestionResponse({
-		required this.result,
-	});
-	MathQuestionResponse.$empty();
-
-	late double result;
-	
-	@override
-	int $estimate() {
-		$reset();
-		int bytes = 16;
-		return bytes;
-	}
-
-	@override
-	void $pack() {
-		$initPack(142788393);
-		$packDouble(result);
-	}
-
-	@override
-	void $unpack() {
-		$initUnpack();
-		result = $unpackDouble();
-	}
-
-	@override
-	String toString() {
-		return 'MathQuestionResponse\x1b[0m(result: ${PackMe.dye(result)})';
-	}
-}
-
 class MathQuestionRequest extends PackMeMessage {
 	MathQuestionRequest({
 		required this.operation,
@@ -90,7 +56,7 @@ class MathQuestionRequest extends PackMeMessage {
 	late MathOperation operation;
 	late int x;
 	late int y;
-	
+
 	MathQuestionResponse $response({
 		required double result,
 	}) {
@@ -102,8 +68,7 @@ class MathQuestionRequest extends PackMeMessage {
 	@override
 	int $estimate() {
 		$reset();
-		int bytes = 11;
-		return bytes;
+		return 11;
 	}
 
 	@override
@@ -128,8 +93,40 @@ class MathQuestionRequest extends PackMeMessage {
 	}
 }
 
+class MathQuestionResponse extends PackMeMessage {
+	MathQuestionResponse({
+		required this.result,
+	});
+	MathQuestionResponse.$empty();
+
+	late double result;
+
+	@override
+	int $estimate() {
+		$reset();
+		return 16;
+	}
+
+	@override
+	void $pack() {
+		$initPack(142788393);
+		$packDouble(result);
+	}
+
+	@override
+	void $unpack() {
+		$initUnpack();
+		result = $unpackDouble();
+	}
+
+	@override
+	String toString() {
+		return 'MathQuestionResponse\x1b[0m(result: ${PackMe.dye(result)})';
+	}
+}
+
 final Map<int, PackMeMessage Function()> manifestMessageFactory = <int, PackMeMessage Function()>{
 	377751248: () => IntroductionMessage.$empty(),
-	142788393: () => MathQuestionResponse.$empty(),
 	752154248: () => MathQuestionRequest.$empty(),
+	142788393: () => MathQuestionResponse.$empty(),
 };

@@ -26,6 +26,7 @@ void main() {
             client = await ConnectMe.connect('ws://127.0.0.1:31337',
                 onConnect: expectAsync0<void>(() {}),
             );
+            await Future<void>.delayed(const Duration(milliseconds: 100));
             await client.close();
             await server.close();
             timer.cancel();
@@ -42,10 +43,12 @@ void main() {
                     expect(client, isA<ConnectMeClient>());
                 }),
             );
+            print(0);
             client = await ConnectMe.connect('127.0.0.1',
                 port: 31337,
                 onConnect: expectAsync0<void>(() {}),
             );
+            await Future<void>.delayed(const Duration(milliseconds: 100));
             await client.close();
             await server.close();
             timer.cancel();
@@ -57,6 +60,7 @@ void main() {
             timer = Timer(const Duration(seconds: 2), () => fail('Operation timed out'));
             server = await ConnectMe.serve(InternetAddress('127.0.0.1'), port: 31337, type: ConnectMeType.ws);
             client = await ConnectMe.connect('ws://127.0.0.1:31337');
+            await Future<void>.delayed(const Duration(milliseconds: 100));
         });
 
         tearDown(() async {
@@ -127,6 +131,7 @@ void main() {
             timer = Timer(const Duration(seconds: 2), () => fail('Operation timed out'));
             server = await ConnectMe.serve(InternetAddress('127.0.0.1'), port: 31337, type: ConnectMeType.tcp);
             client = await ConnectMe.connect('127.0.0.1', port: 31337);
+            await Future<void>.delayed(const Duration(milliseconds: 100));
         });
 
         tearDown(() async {
@@ -148,6 +153,7 @@ void main() {
         test('Server broadcasts String to clients', () async {
             final Completer<Uint8List> completer = Completer<Uint8List>();
             client.listen<Uint8List>((Uint8List message) {
+                print(message);
                 completer.complete(message);
             });
             server.broadcast('Test message from server');
