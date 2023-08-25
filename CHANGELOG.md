@@ -1,3 +1,6 @@
+## v2.1.2
+* PackMe upgraded to v2.0.1: bugfix.
+
 ## v2.1.1
 * PackMe upgraded to v2.0.0: object inheritance implemented, nested arrays support.
 * IMPORTANT: PackMe objects and enumerations from other JSON files are now referenced using filename: "some_user": "@filename:user". No changes required for references within the same file.
