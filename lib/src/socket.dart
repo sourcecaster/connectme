@@ -26,6 +26,8 @@ class ConnectMeSocket {
 			case ConnectMeType.tcp:
 				tcpSocket!.listen(onData, onDone: onDone, onError: onError);
 				break;
+			case ConnectMeType.http:
+				break;
 		}
 	}
 
@@ -39,6 +41,8 @@ class ConnectMeSocket {
 				tcpSocket!.add(Uint8List(8)..buffer.asByteData().setUint64(0, 8 + bytes.length, Endian.big));
 				tcpSocket!.add(bytes);
 				break;
+			case ConnectMeType.http:
+				break;
 		}
 	}
 
@@ -50,6 +54,8 @@ class ConnectMeSocket {
 			case ConnectMeType.tcp:
 				await tcpSocket!.close();
 				tcpSocket!.destroy();
+				break;
+			case ConnectMeType.http:
 				break;
 		}
 	}

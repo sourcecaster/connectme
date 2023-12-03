@@ -13,6 +13,7 @@ part 'src/socket.dart';
 enum ConnectMeType {
 	ws,
 	tcp,
+	http
 }
 
 class ConnectMe {

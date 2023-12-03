@@ -1,3 +1,6 @@
+## v2.2.0
+* HTTP type server added. Method server.on(route, handler) implemented for HTTP routes.
+
 ## v2.1.2
 * PackMe upgraded to v2.0.1: bugfix.
 

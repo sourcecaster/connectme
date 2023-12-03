@@ -13,6 +13,7 @@ class ConnectMeServer<C extends ConnectMeClient> {
 	final List<C> clients = <C>[];
 	final C Function(ConnectMeSocket)? _clientFactory;
 	final Map<Type, List<Function>> _handlers = <Type, List<Function>>{};
+	final Map<String, Function> _routes = <String, Function>{};
 	Timer? clientsQueriesTimer;
 
 	final Function(String)? onLog;
@@ -27,6 +28,9 @@ class ConnectMeServer<C extends ConnectMeClient> {
 				break;
 			case ConnectMeType.tcp:
 				_tcpServer = await ServerSocket.bind(address, port);
+				break;
+			case ConnectMeType.http:
+				_httpServer = await HttpServer.bind(address, port);
 				break;
 		}
 	}
@@ -54,15 +58,40 @@ class ConnectMeServer<C extends ConnectMeClient> {
 
 		try {
 			if (_httpServer != null) {
-				_httpServer!.listen((HttpRequest request) async {
-					final ConnectMeSocket socket = ConnectMeSocket.ws(await WebSocketTransformer.upgrade(request), request);
-					socket._server = this;
-					final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
-						..onConnect = onConnect
-						..onDisconnect = onDisconnect;
-					clients.add(client);
-					onConnect?.call(client);
-				});
+				if (type == ConnectMeType.ws) {
+					_httpServer!.listen((HttpRequest request) async {
+						final ConnectMeSocket socket = ConnectMeSocket.ws(await WebSocketTransformer.upgrade(request), request);
+						socket._server = this;
+						final C client = _clientFactory != null ? _clientFactory!(socket) : ConnectMeClient(socket) as C
+							..onConnect = onConnect
+							..onDisconnect = onDisconnect;
+						clients.add(client);
+						onConnect?.call(client);
+					});
+				}
+				else {
+					_httpServer!.listen((HttpRequest request) async {
+						if (_routes[request.uri.path] != null) {
+							try {
+								await _routes[request.uri.path]?.call(request);
+							}
+							catch (err, stack) {
+								try {
+									request.response
+										..statusCode = HttpStatus.internalServerError
+										..close();
+								}
+								catch (err) { /* Ignore */ }
+								onError?.call('An error occurred while processing a HTTP ${request.uri.path} request: $err', stack);
+							}
+						}
+						else {
+							request.response
+								..statusCode = HttpStatus.notFound
+								..close();
+						}
+					});
+				}
 			}
 			else if (_tcpServer != null) {
 				_tcpServer!.listen((Socket tcpSocket) {
@@ -102,6 +131,12 @@ class ConnectMeServer<C extends ConnectMeClient> {
 			if (where != null && !where(client)) continue;
 			if (data != null && client.socket.state == WebSocket.open) client.socket.add(data);
 		}
+	}
+
+	void on(String route, Function(HttpRequest request) handler) {
+		if (type != ConnectMeType.http) throw Exception('Unable to add routes for non HTTP server.');
+		if (!RegExp('^/.*').hasMatch(route)) route = '/$route';
+		_routes[route] = handler;
 	}
 
 	void listen<T>(Function(T, C) handler) {
