@@ -1,5 +1,5 @@
-## v2.2.2
-* HTTP routes handling updated.
+## v2.2.3
+* HTTP routes handling updated. Bugfixes.
 
 ## v2.2.0
 * HTTP type server added. Method server.on(route, handler) implemented for HTTP routes.

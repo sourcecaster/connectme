@@ -71,30 +71,31 @@ class ConnectMeServer<C extends ConnectMeClient> {
 				}
 				else {
 					_httpServer!.listen((HttpRequest request) async {
-						if (_routes[request.uri.path] != null) {
-							try {
-								for (final String route in _routes.keys) {
-									final RegExp re = RegExp('${RegExp.escape(route)}\$');
-									if (re.hasMatch(request.uri.path)) {
-										await _routes[route]?.call(request);
-										break;
-									}
+						try {
+							bool routeFound = false;
+							for (final String route in _routes.keys) {
+								final RegExp re = RegExp('${RegExp.escape(route)}\$');
+								if (re.hasMatch(request.uri.path)) {
+									routeFound = true;
+									await _routes[route]?.call(request);
+									break;
 								}
 							}
-							catch (err, stack) {
-								try {
-									request.response
-										..statusCode = HttpStatus.internalServerError
-										..close();
-								}
-								catch (err) { /* Ignore */ }
-								onError?.call('An error occurred while processing a HTTP ${request.uri.path} request: $err', stack);
+							if (!routeFound) {
+								request.response
+									..statusCode = HttpStatus.notFound
+									..close();
 							}
+
 						}
-						else {
-							request.response
-								..statusCode = HttpStatus.notFound
-								..close();
+						catch (err, stack) {
+							try {
+								request.response
+									..statusCode = HttpStatus.internalServerError
+									..close();
+							}
+							catch (err) { /* Ignore */ }
+							onError?.call('An error occurred while processing a HTTP ${request.uri.path} request: $err', stack);
 						}
 					});
 				}
