@@ -73,7 +73,13 @@ class ConnectMeServer<C extends ConnectMeClient> {
 					_httpServer!.listen((HttpRequest request) async {
 						if (_routes[request.uri.path] != null) {
 							try {
-								await _routes[request.uri.path]?.call(request);
+								final RegExp re = RegExp('${RegExp.escape(request.uri.path)}\$');
+								for (final String route in _routes.keys) {
+									if (re.hasMatch(route)) {
+										await _routes[route]?.call(request);
+										break;
+									}
+								}
 							}
 							catch (err, stack) {
 								try {
