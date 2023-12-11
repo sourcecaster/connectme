@@ -1,4 +1,4 @@
-## v2.2.1
+## v2.2.2
 * HTTP routes handling updated.
 
 ## v2.2.0
